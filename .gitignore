@@ -1,32 +1,37 @@
-# Prerequisites
-*.d
+# ── Build ──────────────────────────────────────────────────────────────────
+build/
 
-# Compiled Object files
-*.slo
-*.lo
+# ── LSP / clangd ───────────────────────────────────────────────────────────
+compile_commands.json
+.cache/
+
+# ── Datos (ficheros grandes, no se versionan) ───────────────────────────────
+data/
+
+# ── Artefactos de compilación ───────────────────────────────────────────────
+*.d
 *.o
 *.obj
-
-# Precompiled Headers
+*.slo
+*.lo
 *.gch
 *.pch
-
-# Compiled Dynamic libraries
 *.so
 *.dylib
 *.dll
-
-# Fortran module files
-*.mod
-*.smod
-
-# Compiled Static libraries
 *.lai
 *.la
 *.a
 *.lib
-
-# Executables
 *.exe
 *.out
 *.app
+*.mod
+*.smod
+
+# ── Editores ────────────────────────────────────────────────────────────────
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
