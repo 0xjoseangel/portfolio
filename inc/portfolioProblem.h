@@ -13,7 +13,7 @@ private:
   std::vector<double> means;                   // mu_i
   std::vector<std::vector<double>> covariance; // Sigma_ij
 
-  // TRUCO DE OPTIMIZACIÓN: Precalculamos la parte del sumatorio del beneficio
+  // Precalculamos la parte del sumatorio del beneficio solo una vez
   std::vector<double> benefit_factors;
 
   double lambda;

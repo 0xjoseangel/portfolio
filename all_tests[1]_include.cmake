@@ -1,0 +1,5 @@
+if(EXISTS "/home/joseangel/Universidad/INFO/MH/p1/portfolio/portfolio/all_tests[1]_tests.cmake")
+  include("/home/joseangel/Universidad/INFO/MH/p1/portfolio/portfolio/all_tests[1]_tests.cmake")
+else()
+  add_test(all_tests_NOT_BUILT all_tests_NOT_BUILT)
+endif()
