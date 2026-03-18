@@ -1,3 +1,4 @@
+#include <greedy.h>
 #include <iostream>
 #include <portfolioProblem.h>
 #include <problem.h>
@@ -42,19 +43,30 @@ int main(int argc, char *argv[]) {
   cout << "Rango: [" << lo << ", " << hi << "]\n";
   cout << "Lambda: " << problem.getLambda() << "\n\n";
 
-  // Creamos el algoritmo aleatorio
+  // === Algoritmo aleatorio ===
   RandomSearch<double> ralg;
-
   auto solution = ralg.optimize(problem, MAX_EVALS);
 
-  cout << "Mejor fitness: " << solution.fitness << endl;
-  cout << "Max evals: " << solution.evaluations << endl;
-
-  cout << "Mejor Solucion (primeros 10 valores): [";
+  cout << "=== Búsqueda Aleatoria ===\n";
+  cout << "Mejor fitness:  " << solution.fitness << "\n";
+  cout << "Evaluaciones:   " << solution.evaluations << "\n";
+  cout << "Primeros 10 pesos: [";
   int a_imprimir = std::min((int)solution.solution.size(), 10);
-  for (int i = 0; i < a_imprimir; i++) {
-    cout << solution.solution[i] << ", ";
-  }
+  for (int i = 0; i < a_imprimir; i++)
+    cout << solution.solution[i] << (i + 1 < a_imprimir ? ", " : "");
+  cout << "...]\n\n";
+
+  // === Algoritmo greedy ===
+  Greedy<double> greedy;
+  solution = greedy.optimize(problem, MAX_EVALS);
+
+  cout << "=== Greedy ===\n";
+  cout << "Mejor fitness:  " << solution.fitness << "\n";
+  cout << "Evaluaciones:   " << solution.evaluations << "\n";
+  cout << "Primeros 10 pesos: [";
+  a_imprimir = std::min((int)solution.solution.size(), 10);
+  for (int i = 0; i < a_imprimir; i++)
+    cout << solution.solution[i] << (i + 1 < a_imprimir ? ", " : "");
   cout << "...]\n";
 
   return 0;

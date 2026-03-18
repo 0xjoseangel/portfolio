@@ -99,7 +99,8 @@ void PortfolioProblem::precomputeMatrices() {
         cov_sum += (returns[t][i] - means[i]) * (returns[t][j] - means[j]);
       }
 
-      covariance[i][j] = cov_sum;
+      covariance[i][j] =
+          cov_sum / T; // La covarianza se mide asi. Fallo en el guion
     }
   }
 }

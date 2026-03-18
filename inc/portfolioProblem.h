@@ -47,6 +47,7 @@ public:
     return covariance;
   }
   double getLambda() const { return lambda; }
+  int getT() const { return T; }
 };
 
 #endif
