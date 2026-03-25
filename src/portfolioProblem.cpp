@@ -38,23 +38,24 @@ void PortfolioProblem::loadData(const std::string &filename) {
     std::vector<double> daily_returns;
     std::stringstream ss(line);
 
-    // Saltamos el dia
-    std::getline(ss, token, ',');
+    // Leemos la fecha para separar train (2015-2024) de test (2025)
+    std::string fecha;
+    std::getline(ss, fecha, ',');
+    bool is_test = (fecha.size() >= 4 && fecha.substr(0, 4) == "2025");
 
     // Leemos el resto de columnas de esa fila (los valores de las empresas)
     while (std::getline(ss, token, ',')) {
       try {
-        // Convertimos el texto (token) a double y lo metemos en el vector del
-        // día
         daily_returns.push_back(std::stod(token));
       } catch (const std::invalid_argument &e) {
-        // Si hay un hueco vacío o un error de parseo, metemos un 0.0 por
-        // seguridad
         daily_returns.push_back(0.0);
       }
     }
-    // Añadimos la fila entera a nuestra matriz principal
-    returns.push_back(daily_returns);
+
+    if (is_test)
+      returns_test.push_back(daily_returns);
+    else
+      returns.push_back(daily_returns);
   }
 
   file.close();
@@ -62,47 +63,63 @@ void PortfolioProblem::loadData(const std::string &filename) {
   if (!returns.empty()) {
     T = returns.size();
     N = returns[0].size();
+    T_test = returns_test.size();
   } else {
-    T = 0;
-    N = 0;
+    T = 0; N = 0; T_test = 0;
     std::cerr << "Advertencia: El archivo " << filename << " estaba vacío."
               << std::endl;
   }
 }
 
 void PortfolioProblem::precomputeMatrices() {
+  // --- TRAIN (2015-2024) ---
   means.assign(N, 0.0);
   benefit_factors.assign(N, 0.0);
   covariance.assign(N, std::vector<double>(N, 0.0));
 
   for (int i = 0; i < N; ++i) {
-    double sum_mu = 0.0;
-    double sum_log = 0.0;
-
+    double sum_mu = 0.0, sum_log = 0.0;
     for (int t = 0; t < T; ++t) {
-      sum_mu += returns[t][i];
-      sum_log += std::log(
-          1.0 + returns[t][i]); // Usamos std::log que es logaritmo natural
+      sum_mu  += returns[t][i];
+      sum_log += std::log(1.0 + returns[t][i]);
     }
-
-    means[i] = sum_mu / T;
-
+    means[i]          = sum_mu  / T;
     benefit_factors[i] = sum_log / T;
   }
 
-  // 3. Calculamos la Matriz de Covarianza
-  for (int i = 0; i < N; ++i) {
+  for (int i = 0; i < N; ++i)
     for (int j = 0; j < N; ++j) {
       double cov_sum = 0.0;
-
-      for (int t = 0; t < T; ++t) {
+      for (int t = 0; t < T; ++t)
         cov_sum += (returns[t][i] - means[i]) * (returns[t][j] - means[j]);
-      }
-
-      covariance[i][j] =
-          cov_sum / T; // La covarianza se mide asi. Fallo en el guion
+      covariance[i][j] = cov_sum / T;
     }
+
+  // --- TEST (2025) ---
+  means_test.assign(N, 0.0);
+  benefit_factors_test.assign(N, 0.0);
+  covariance_test.assign(N, std::vector<double>(N, 0.0));
+
+  if (T_test == 0) return;
+
+  for (int i = 0; i < N; ++i) {
+    double sum_mu = 0.0, sum_log = 0.0;
+    for (int t = 0; t < T_test; ++t) {
+      sum_mu  += returns_test[t][i];
+      sum_log += std::log(1.0 + returns_test[t][i]);
+    }
+    means_test[i]          = sum_mu  / T_test;
+    benefit_factors_test[i] = sum_log / T_test;
   }
+
+  for (int i = 0; i < N; ++i)
+    for (int j = 0; j < N; ++j) {
+      double cov_sum = 0.0;
+      for (int t = 0; t < T_test; ++t)
+        cov_sum += (returns_test[t][i] - means_test[i]) *
+                   (returns_test[t][j] - means_test[j]);
+      covariance_test[i][j] = cov_sum / T_test;
+    }
 }
 
 tSolution<double> PortfolioProblem::createSolution() {
@@ -284,21 +301,26 @@ std::pair<double, double> PortfolioProblem::getSolutionDomainRange() {
 }
 
 tFitness PortfolioProblem::fitness(const tSolution<double> &solution) {
-  double beneficio = 0.0;
-  double riesgo = 0.0;
-
-  // Calculamos Beneficio(w)
-  for (int i = 0; i < N; ++i) {
+  double beneficio = 0.0, riesgo = 0.0;
+  for (int i = 0; i < N; ++i)
     beneficio += solution[i] * benefit_factors[i];
-  }
-
-  // Calculamos Riesgo(w)
-  for (int i = 0; i < N; ++i) {
-    for (int j = 0; j < N; ++j) {
+  for (int i = 0; i < N; ++i)
+    for (int j = 0; j < N; ++j)
       riesgo += solution[i] * covariance[i][j] * solution[j];
-    }
-  }
-
-  // fitness(w) = Beneficio(w) - lambda * Riesgo(w)
   return beneficio - (lambda * riesgo);
+}
+
+double PortfolioProblem::beneficioTest(const tSolution<double> &solution) {
+  double beneficio = 0.0;
+  for (int i = 0; i < N; ++i)
+    beneficio += solution[i] * benefit_factors_test[i];
+  return beneficio;
+}
+
+tFitness PortfolioProblem::fitnessTest(const tSolution<double> &solution) {
+  double riesgo = 0.0;
+  for (int i = 0; i < N; ++i)
+    for (int j = 0; j < N; ++j)
+      riesgo += solution[i] * covariance_test[i][j] * solution[j];
+  return beneficioTest(solution) - (lambda * riesgo);
 }

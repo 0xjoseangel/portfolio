@@ -1,0 +1,625 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[spanish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+\usepackage[hidelinks]{hyperref}
+\usepackage{float}
+\usepackage{graphicx}
+\newcommand{\maybeimage}[3]{%
+  \IfFileExists{#1}{\includegraphics[#2]{#1}}%
+  {\fbox{\parbox{0.7\textwidth}{\centering\vspace{1cm}[Figura pendiente: #3]\vspace{1cm}}}}%
+}
+\usepackage{caption}
+\usepackage{parskip}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{xcolor}
+\usepackage{array}
+
+\geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
+\setlength{\parskip}{6pt}
+
+% Ajuste de espaciado en secciones
+\titlespacing*{\section}{0pt}{14pt}{6pt}
+\titlespacing*{\subsection}{0pt}{10pt}{4pt}
+
+% Comando para valores pendientes
+\newcommand{\placeholder}[0]{\textit{---}}
+
+% Configuración de algorithm2e
+\SetKwInput{KwIn}{Entrada}
+\SetKwInput{KwOut}{Salida}
+\SetKw{KwReturn}{devolver}
+\SetKwFor{Para}{para}{hacer}{fin para}
+\SetKwFor{Mientras}{mientras}{hacer}{fin mientras}
+\SetKwIF{Si}{SiNo}{OSiNo}{si}{entonces}{si no si}{si no}{fin si}
+\SetKwFunction{fitness}{fitness}
+\SetKwFunction{fix}{fix}
+\SetKwFunction{createSolution}{crearSolución}
+\SetKwFunction{shuffle}{barajar}
+
+%-----------------------------------------------------------------------
+\begin{document}
+
+%-----------------------------------------------------------------------
+% PORTADA
+%-----------------------------------------------------------------------
+\begin{titlepage}
+  \centering
+  \vspace*{2cm}
+  {\Large \textbf{Universidad de Granada}\\[0.3cm]
+          \textbf{ETSIIT Informática y Telecomunicación}\\[0.3cm]
+          Dpto.\ de Ciencias de la Computación e Inteligencia Artificial}
+
+  \vspace{2.5cm}
+  {\LARGE \textbf{Metaheurísticas}}\\[0.5cm]
+  {\Large Práctica 1}\\[0.3cm]
+  {\large Técnicas de Búsqueda Local y Algoritmos Greedy\\
+           para el Problema de Portfolio}
+
+  \vspace{1.5cm}
+  {\large Curso 2025--2026}
+
+  \vfill
+  \begin{tabular}{rl}
+    \textbf{Nombre:}  & Jose Angel Carretero Montes \\[4pt]
+    \textbf{DNI:}     & 25628892S \\[4pt]
+    \textbf{Email:}   & \texttt{joseangel1@correo.ugr.es} \\[4pt]
+    \textbf{Grupo:}   & Grupo 3 \\
+  \end{tabular}
+  \vspace{1.5cm}
+\end{titlepage}
+
+%-----------------------------------------------------------------------
+% ÍNDICE
+%-----------------------------------------------------------------------
+\tableofcontents
+\newpage
+
+%-----------------------------------------------------------------------
+\section{Descripción del Problema}
+%-----------------------------------------------------------------------
+
+El \textbf{Problema de Portfolio} consiste en determinar la asignación óptima de capital
+entre $N$ activos financieros con el objetivo de maximizar el retorno esperado
+minimizando simultáneamente el riesgo.
+
+\subsection*{Representación de los datos}
+
+Para cada activo $i \in \{1,\ldots,N\}$ y día $t \in \{1,\ldots,T\}$ se dispone
+del retorno diario $\mu_{ti}$, calculado como el ratio de mejora relativa del valor:
+\[
+  \mu_{ti} = \frac{V_{ti} - V_{(t+1)i}}{V_{ti}}
+\]
+Los datos empleados cubren el periodo 2015--2024 para entrenamiento y el año 2025
+para evaluación de generalización.
+
+\subsection*{Función objetivo}
+
+Dado un vector de pesos $w = (w_1,\ldots,w_N)$, la calidad de la cartera se mide como:
+\[
+  \text{fitness}(w) = \text{Beneficio}(w) - \lambda \cdot \text{Riesgo}(w)
+\]
+donde:
+\[
+  \text{Beneficio}(w) = \sum_{i=1}^{N} w_i \cdot \frac{1}{T}\sum_{t=1}^{T}\log(1+\mu_{ti})
+  \qquad
+  \text{Riesgo}(w) = \sum_{i=1}^{N}\sum_{j=1}^{N} w_i \cdot \Sigma_{ij} \cdot w_j
+\]
+siendo $\Sigma_{ij} = \frac{1}{T}\sum_{t=1}^{T}(\mu_{ti}-\bar{\mu}_i)(\mu_{tj}-\bar{\mu}_j)$
+la covarianza entre activos $i$ y $j$, y $\lambda = 500$ el factor de penalización
+del riesgo.
+
+\subsection*{Restricciones}
+
+\[
+  \sum_{i=1}^{N} w_i = 1 \qquad
+  w_i = 0 \;\vee\; lo \le w_i \le hi \quad \forall i \in 1\ldots N
+\]
+
+Los rangos $[lo, hi]$ varían según el conjunto de datos (véase Sección~\ref{sec:experimentos}).
+
+%-----------------------------------------------------------------------
+\section{Aplicación de los Algoritmos al Problema}
+%-----------------------------------------------------------------------
+
+\subsection{Representación de soluciones}
+
+Una solución queda representada como un vector $w \in \mathbb{R}^N$
+donde cada componente $w_i$ indica la fracción del capital invertida en el activo $i$.
+La restricción de cardinalidad implica que $w_i$ puede ser exactamente cero
+(no se invierte en esa empresa) o estar en el intervalo $[lo, hi]$.
+
+\subsection{Generación aleatoria de soluciones}
+
+Para construir una solución aleatoria válida se procede como sigue:
+
+\begin{enumerate}
+  \item Se elige aleatoriamente un número de empresas en las que \emph{no} se invierte,
+        $n_0 \in [1, N{-}1]$.
+  \item Los índices restantes $n_+ = N - n_0$ se seleccionan barajando un vector de índices.
+  \item A cada empresa activa se le asigna un peso aleatorio en $[lo, hi]$.
+  \item Se normaliza: $w_i \leftarrow w_i / \sum_k w_k$.
+  \item Se llama al operador \fix{} para garantizar factibilidad.
+\end{enumerate}
+
+\subsection{Operador de reparación (\texttt{fix})}
+
+Tras cualquier modificación de la solución puede violarse alguna restricción.
+El operador de reparación actúa en tres fases:
+
+\begin{enumerate}
+  \item \textbf{Normalización:} $w_i \leftarrow w_i / \sum_k w_k$.
+  \item \textbf{Recorte de rango:} si $0 < w_i < lo$ entonces $w_i \leftarrow 0$;
+        si $w_i > hi$ entonces $w_i \leftarrow hi$.
+  \item \textbf{Redistribución iterativa:} mientras $|\sum w_i - 1| > \varepsilon$:
+        \begin{itemize}
+          \item Si falta dinero por invertir: se reparte la diferencia entre las empresas
+                activas con $w_i < hi$. Si no hay candidatos, se activa una empresa
+                inactiva asignándole $lo$.
+          \item Si sobra dinero: se retira la diferencia de las empresas con $w_i > lo$.
+        \end{itemize}
+\end{enumerate}
+
+\subsection{Precómputo de matrices}
+
+Para acelerar la evaluación, se precalculan antes de ejecutar los algoritmos:
+el vector de factores de beneficio $b_i = \frac{1}{T}\sum_t \log(1+\mu_{ti})$
+y la matriz de covarianza $\Sigma$, tanto para los datos de entrenamiento (2015--2024)
+como para los de test (2025). Así, \texttt{fitness} se calcula en $O(N^2)$.
+
+%-----------------------------------------------------------------------
+\section{Algoritmos}
+%-----------------------------------------------------------------------
+
+\subsection{Algoritmo Aleatorio (\textit{Random Search})}
+
+Genera \texttt{MAX\_EVALS} soluciones aleatorias independientes y devuelve la mejor.
+Sirve como referencia inferior de calidad.
+
+\begin{algorithm}[H]
+\caption{Búsqueda Aleatoria}
+\KwIn{problema, maxEvals}
+\KwOut{mejor solución encontrada}
+$\text{mejorFit} \leftarrow -\infty$\;
+\Para{$i \leftarrow 1$ \KwTo $\text{maxEvals}$}{
+  $s \leftarrow$ \createSolution{}\;
+  $f \leftarrow$ \fitness{$s$}\;
+  \Si{$f > \text{mejorFit}$}{
+    $\text{mejorFit} \leftarrow f$\;
+    $\text{mejorSol} \leftarrow s$\;
+  }
+}
+\KwReturn{$\text{mejorSol}$}
+\end{algorithm}
+
+\subsection{Algoritmo Greedy}
+
+Construye una solución de forma determinista asignando capital en orden decreciente
+de una función heurística que estima el valor marginal de cada activo.
+
+\subsubsection*{Función heurística}
+
+La heurística para el activo $i$ estima su contribución neta al fitness si fuese
+el único activo de la cartera, penalizando su covarianza media con el resto:
+\[
+  h(i) = b_i - \lambda \cdot \frac{1}{N}\sum_{j=1}^{N} \Sigma_{ij}
+\]
+donde $b_i$ es el factor de beneficio precalculado y $\Sigma_{ij}$ la covarianza.
+
+\begin{algorithm}[H]
+\caption{Greedy}
+\KwIn{problema}
+\KwOut{solución construida}
+Calcular $h(i)$ para todo $i \in \{1,\ldots,N\}$\;
+Ordenar empresas en orden decreciente por $h(i)$ $\rightarrow$ lista \textit{companies}\;
+$w \leftarrow \mathbf{0}$;\quad $suma \leftarrow 0$\;
+\Mientras{$suma < 1 - \varepsilon$ \textbf{y} quedan empresas en \textit{companies}}{
+  $c \leftarrow$ primera empresa de \textit{companies}\;
+  Eliminar $c$ de \textit{companies}\;
+  $w[c] \leftarrow \min(hi,\; 1 - suma)$\;
+  $suma \leftarrow suma + w[c]$\;
+}
+\KwReturn{$w$}
+\end{algorithm}
+
+\noindent El greedy es determinista: produce siempre la misma solución independientemente
+de la semilla, por lo que su resultado es idéntico en las 50 ejecuciones.
+
+\subsection{Búsqueda Local (BL)}
+
+Implementa una búsqueda de \textbf{primero mejor} (\textit{first improvement})
+sobre el vecindario definido por todos los pares de empresas $(p_1, p_2)$,
+$p_1 \neq p_2$, con $p_1, p_2 \in \{1,\ldots,N\}$.
+
+\subsubsection*{Operador de generación de vecino}
+
+Dado un par $(origen, destino)$, el vecino se obtiene transfiriendo un
+$ratio = 0{,}4$ del peso del activo origen al activo destino:
+\[
+  \text{change}(w, origen, destino) : \quad
+  w'_{origen} = w_{origen} \cdot (1 - ratio),\quad
+  w'_{destino} = w_{destino} + ratio \cdot w_{origen}
+\]
+Tras el cambio se aplica \fix{} para restaurar la factibilidad.
+
+\subsubsection*{Esquema de la BL}
+
+\begin{algorithm}[H]
+\caption{Búsqueda Local (primero mejor)}
+\KwIn{problema, maxEvals}
+\KwOut{mejor solución encontrada}
+$P \leftarrow$ todos los pares $(i,j)$ con $i \neq j$, $i,j \in \{1,\ldots,N\}$\;
+$s \leftarrow$ \createSolution{};\quad $f \leftarrow$ \fitness{$s$};\quad $evals \leftarrow 1$\;
+$mejora \leftarrow \text{verdadero}$\;
+\Mientras{$mejora$ \textbf{y} $evals < maxEvals$}{
+  $mejora \leftarrow \text{falso}$\;
+  \shuffle{$P$}\;
+  \Para{cada $(origen, destino) \in P$}{
+    \Si{$evals \geq maxEvals$}{\textbf{romper}\;}
+    $s' \leftarrow s$;\quad
+    $s'[origen] \leftarrow s'[origen] \cdot 0{,}6$;\quad
+    $s'[destino] \leftarrow s'[destino] + s[origen] \cdot 0{,}4$\;
+    \fix{$s'$};\quad
+    $f' \leftarrow$ \fitness{$s'$};\quad $evals \mathrel{+}= 1$\;
+    \Si{$f' > f$}{
+      $s \leftarrow s'$;\quad $f \leftarrow f'$;\quad $mejora \leftarrow \text{verdadero}$\;
+      \textbf{romper}\;
+    }
+  }
+}
+\KwReturn{$s$}
+\end{algorithm}
+
+\noindent El vecindario tiene $N \cdot (N{-}1)$ vecinos. La exploración se baraja en
+cada iteración para evitar sesgos de orden. La condición de parada es la convergencia
+(ninguna mejora en un recorrido completo) o el agotamiento del presupuesto.
+
+\subsection{Simulated Annealing (SA) --- Trabajo voluntario}
+
+El Recocido Simulado extiende la búsqueda local aceptando soluciones peores con
+probabilidad $e^{\Delta f / T}$, lo que permite escapar de óptimos locales.
+La temperatura $T$ decrece geométricamente ($T \leftarrow T \cdot \alpha$),
+lo que crea una transición natural de exploración (alta $T$) a explotación (baja $T$).
+
+\subsubsection*{Calibración automática de temperatura}
+
+En lugar de fijar $T_0$ manualmente, se estima automáticamente realizando 200
+movimientos aleatorios, calculando el empeoramiento medio $\overline{\Delta}$
+de los movimientos que empeoran, y fijando:
+\[
+  T_0 = \frac{-\overline{\Delta}}{\ln(0{,}8)}
+\]
+de modo que al inicio se acepta aproximadamente el 80\,\% de los movimientos
+que empeoran, garantizando exploración amplia independientemente de la escala
+del problema.
+
+\subsubsection*{Operador de vecino}
+
+Se elige aleatoriamente una empresa \textit{origen} con peso positivo y una empresa
+\textit{destino} cualquiera distinta. Se transfiere una fracción aleatoria
+$\delta \in [0{,}1, 0{,}9]$ del peso del origen al destino, seguida de \fix{}.
+La aleatoriedad de $\delta$ proporciona mayor diversidad que el ratio fijo de la BL.
+
+\begin{algorithm}[H]
+\caption{Simulated Annealing}
+\KwIn{problema, maxEvals, $\alpha = 0{,}999$}
+\KwOut{mejor solución encontrada}
+$T \leftarrow$ calibrar$T_0$(problema)\;
+$s \leftarrow$ \createSolution{};\quad $f \leftarrow$ \fitness{$s$}\;
+$s^* \leftarrow s$;\quad $f^* \leftarrow f$\;
+\Para{$evals \leftarrow 1$ \KwTo $maxEvals - 1$}{
+  $activas \leftarrow \{i : s[i] > 0\}$\;
+  $origen \leftarrow$ aleatorio en $activas$\;
+  $destino \leftarrow$ aleatorio en $\{1,\ldots,N\} \setminus \{origen\}$\;
+  $s' \leftarrow s$;\quad
+  $\delta \leftarrow$ uniforme$(0{,}1,\; 0{,}9)$\;
+  $s'[origen] \mathrel{-}= \delta \cdot s[origen]$;\quad
+  $s'[destino] \mathrel{+}= \delta \cdot s[origen]$\;
+  \fix{$s'$};\quad $f' \leftarrow$ \fitness{$s'$}\;
+  \Si{$f' > f$ \textbf{o} $\text{aleatorio}(0,1) < e^{(f'-f)/T}$}{
+    $s \leftarrow s'$;\quad $f \leftarrow f'$\;
+    \Si{$f > f^*$}{$s^* \leftarrow s$;\quad $f^* \leftarrow f$\;}
+  }
+  $T \leftarrow T \cdot \alpha$\;
+}
+\KwReturn{$s^*$}
+\end{algorithm}
+
+%-----------------------------------------------------------------------
+\section{Estructura del Código y Manual de Usuario}
+%-----------------------------------------------------------------------
+
+\subsection{Estructura de directorios}
+
+\begin{verbatim}
+portfolio/
+  main.cpp                  # Punto de entrada, experimentos de 50 semillas
+  CMakeLists.txt            # Sistema de construcción
+  boxplot.py                # Script Python para gráficas de cajas
+  data/
+    ibex_35.csv             # 30 empresas IBEX 35, 2015-2025
+    syp_100.csv             # 97 empresas S&P 100, 2015-2025
+    syp_500.csv             # 457 empresas S&P 500, 2015-2025
+  common/
+    mh.h                    # Interfaz genérica MH<tDomain>
+    problem.h               # Interfaz genérica Problem<tDomain>
+    solution.h              # Typedefs tSolution, tFitness
+    random.hpp              # Generador pseudoaleatorio de alta calidad
+  inc/
+    portfolioProblem.h      # Declaración del problema
+    randomSearch.h          # Algoritmo aleatorio
+    greedy.h                # Algoritmo greedy
+    localsearch.h           # Búsqueda local
+    simulatedAnnealing.h    # Simulated Annealing (voluntario)
+  src/
+    portfolioProblem.cpp    # Implementación: carga datos, matrices, fitness
+\end{verbatim}
+
+\subsection{Compilación}
+
+\begin{verbatim}
+mkdir build && cd build
+cmake ..
+cmake --build .
+\end{verbatim}
+
+\subsection{Ejecución}
+
+El ejecutable \texttt{main} no requiere argumentos. Ejecuta automáticamente los
+cuatro algoritmos sobre los tres conjuntos de datos con 50 semillas cada uno,
+imprime las tablas de medias por pantalla y genera los ficheros CSV para boxplot:
+
+\begin{verbatim}
+cd build
+cmake --build . && cd ..
+./build/main
+\end{verbatim}
+
+Al terminar se generan en el directorio raíz:
+\texttt{results\_ibex\_35.csv}, \texttt{results\_syp\_100.csv},
+\texttt{results\_syp\_500.csv}.
+
+Para generar los boxplots (requiere Python con \texttt{pandas} y \texttt{seaborn}):
+
+\begin{verbatim}
+python3 boxplot.py
+\end{verbatim}
+
+Los parámetros configurables en \texttt{main.cpp} son \texttt{N\_SEEDS} (número
+de semillas, por defecto 50) y \texttt{MAX\_EVALS} (presupuesto de evaluaciones,
+por defecto 10\,000). Las semillas utilizadas son $1, 2, \ldots, 50$, iguales
+para todos los algoritmos y conjuntos de datos.
+
+%-----------------------------------------------------------------------
+\section{Experimentos y Resultados}
+\label{sec:experimentos}
+%-----------------------------------------------------------------------
+
+\subsection{Casos del problema}
+
+\begin{center}
+\begin{tabular}{lrrrl}
+\toprule
+\textbf{Fichero} & \textbf{Empresas ($N$)} & \textbf{Días train ($T$)} & \textbf{Días test} & \textbf{Rango $[lo, hi]$} \\
+\midrule
+\texttt{ibex\_35.csv}  & 30  & $\sim$2560 & 254 & $[0.005,\; 0.08]$ \\
+\texttt{syp\_100.csv}  & 97  & $\sim$2516 & 249 & $[0.005,\; 0.05]$ \\
+\texttt{syp\_500.csv}  & 457 & $\sim$2516 & 249 & $[0.005,\; 0.02]$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Parámetros comunes: $\lambda = 500$, \texttt{MAX\_EVALS} $= 10\,000$,
+50 semillas ($1$--$50$), $\alpha_{\text{SA}} = 0{,}999$.
+
+\subsection{Resultados}
+
+Las tablas muestran la media de las 50 ejecuciones. El fitness reportado para el
+Greedy es siempre el mismo al ser determinista.
+
+\begin{table}[H]
+\centering
+\caption{Resultados IBEX 35 (medias, 50 semillas)}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Algoritmo} & \textbf{Fit.\ 2015--24} & \textbf{Fit.\ 2025} & \textbf{Ben.\ 2025} & \textbf{Evals} & \textbf{Tiempo (s)} \\
+\midrule
+Greedy  & $-0.032$ & $-0.019$ & $-0.000$ & $1$         & $0.000$ \\
+Random  & $-0.033$ & $-0.022$ & $0.000$  & $10\,000$   & $0.282$ \\
+BL      & $-0.030$ & $-0.019$ & $-0.000$ & $10\,000$   & $0.259$ \\
+SA      & $-0.030$ & $-0.019$ & $0.000$  & $10\,000$   & $0.187$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Resultados S\&P 100 (medias, 50 semillas)}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Algoritmo} & \textbf{Fit.\ 2015--24} & \textbf{Fit.\ 2025} & \textbf{Ben.\ 2025} & \textbf{Evals} & \textbf{Tiempo (s)} \\
+\midrule
+Greedy  & $-0.025$ & $-0.031$ & $0.000$  & $1$         & $0.001$ \\
+Random  & $-0.026$ & $-0.033$ & $0.000$  & $10\,000$   & $1.913$ \\
+BL      & $-0.022$ & $-0.027$ & $0.000$  & $10\,000$   & $4.634$ \\
+SA      & $-0.022$ & $-0.027$ & $0.000$  & $10\,000$   & $1.701$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Resultados S\&P 500 (medias, 50 semillas)}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Algoritmo} & \textbf{Fit.\ 2015--24} & \textbf{Fit.\ 2025} & \textbf{Ben.\ 2025} & \textbf{Evals} & \textbf{Tiempo (s)} \\
+\midrule
+Greedy  & $-0.026$ & $-0.031$ & $0.000$  & $1$         & $0.038$ \\
+Random  & $-0.028$ & $-0.039$ & $0.000$  & $10\,000$   & $42.966$ \\
+BL      & $-0.019$ & $-0.028$ & $0.000$  & $10\,000$   & $199.447$ \\
+SA      & $-0.019$ & $-0.027$ & $0.000$  & $10\,000$   & $35.846$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Boxplots}
+
+Las Figuras~\ref{fig:box_ibex}--\ref{fig:box_syp500} muestran la distribución del
+fitness de entrenamiento en las 50 ejecuciones para cada conjunto de datos.
+
+\begin{figure}[H]
+  \centering
+  \maybeimage{results_ibex_35.png}{width=0.7\textwidth}{results\_ibex\_35.png}
+  \caption{Distribución del fitness (2015--2024) en IBEX 35.}
+  \label{fig:box_ibex}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \maybeimage{results_syp_100.png}{width=0.7\textwidth}{results\_syp\_100.png}
+  \caption{Distribución del fitness (2015--2024) en S\&P 100.}
+  \label{fig:box_syp100}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \maybeimage{results_syp_500.png}{width=0.7\textwidth}{results\_syp\_500.png}
+  \caption{Distribución del fitness (2015--2024) en S\&P 500.}
+  \label{fig:box_syp500}
+\end{figure}
+
+%-----------------------------------------------------------------------
+\section{Análisis de Resultados}
+%-----------------------------------------------------------------------
+
+\subsection{Calidad de las soluciones}
+
+\textbf{BL supera claramente a Random y Greedy.} En ambos conjuntos con datos
+completos (IBEX 35 y S\&P 100), la búsqueda local obtiene un fitness
+aproximadamente un 11\,\% mejor que el algoritmo aleatorio y un 7\,\% mejor que
+el greedy. Esto confirma que explotar la estructura local del espacio de búsqueda
+es efectivo para este problema.
+
+\textbf{El greedy ofrece una solución de calidad razonable con una única evaluación.}
+Con solo 1 evaluación frente a las 10\,000 del resto, la heurística basada en
+beneficio menos covarianza media supera al algoritmo aleatorio, lo que demuestra
+que la función heurística captura información relevante del problema.
+
+\textbf{SA y BL convergen a resultados prácticamente idénticos en IBEX 35 y S\&P 100.}
+Esto se explica porque con $N$ pequeño (30 y 97 empresas) la BL ya es capaz de
+recorrer el vecindario ($N(N{-}1)$ vecinos) en pocas iteraciones antes de agotar
+el presupuesto, alcanzando óptimos locales de calidad comparable a los que
+encuentra el SA.
+
+\textbf{SA muestra mayor ventaja en S\&P 500 ($N=457$).} Con un vecindario de
+457\,$\times$\,456\,$\approx$\,208\,000 pares, la BL apenas puede completar
+un recorrido completo en 10\,000 evaluaciones y queda atrapada en el primer
+óptimo local encontrado. El SA, al aceptar soluciones peores con probabilidad
+controlada por la temperatura, puede escapar de esos óptimos y explorar regiones
+más prometedoras del espacio.
+
+\subsection{Variabilidad}
+
+La BL presenta muy baja varianza entre semillas en los tres conjuntos (los
+boxplots muestran cajas estrechas), lo que indica que el vecindario es suficiente
+para guiar la búsqueda hacia zonas similares independientemente del punto de
+partida. El SA hereda esta estabilidad y en S\&P 500 converge consistentemente
+a valores de fitness similares entre semillas, algo que la BL no logra dado que
+su resultado depende en mayor medida del punto inicial.
+
+El algoritmo aleatorio presenta la mayor varianza, especialmente en S\&P 500
+donde el espacio de búsqueda es enorme y 10\,000 muestras aleatorias cubren
+una fracción ínfima de él.
+
+\subsection{Coste computacional y escalabilidad}
+
+\textbf{Coste por evaluación.}
+La operación dominante es el cálculo de \texttt{fitness}, que requiere
+$O(N^2)$ multiplicaciones (producto $w^\top \Sigma w$).
+El operador \texttt{fix} añade un coste $O(N)$ por llamada, pero se vuelve
+relevante cuando $N$ es grande y el proceso de redistribución de pesos necesita
+más iteraciones para converger.
+
+\textbf{Escalado empírico con $N$.}
+La Tabla~\ref{tab:tiempos} recoge los tiempos medios por semilla de cada algoritmo.
+Tomando S\&P 100 como referencia y comparando con S\&P 500
+($N$ crece un factor $457/97 \approx 4{,}7$):
+
+\begin{table}[H]
+\centering
+\caption{Tiempo medio por semilla (segundos) y factor de escala respecto a S\&P 100}
+\label{tab:tiempos}
+\begin{tabular}{lrrrrrr}
+\toprule
+ & \multicolumn{2}{c}{\textbf{IBEX 35} ($N=30$)}
+ & \multicolumn{2}{c}{\textbf{S\&P 100} ($N=97$)}
+ & \multicolumn{2}{c}{\textbf{S\&P 500} ($N=457$)} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+\textbf{Alg.} & t (s) & ×100 & t (s) & ref. & t (s) & ×100 \\
+\midrule
+Greedy & $0.000$ & ---    & $0.001$ & $1\times$  & $0.038$ & $38\times$ \\
+Random & $0.006$ & $0.3\times$ & $0.038$ & $1\times$  & $0.859$ & $23\times$ \\
+BL     & $0.005$ & $0.1\times$ & $0.093$ & $1\times$  & $3.989$ & $43\times$ \\
+SA     & $0.004$ & $0.2\times$ & $0.034$ & $1\times$  & $0.717$ & $21\times$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\noindent El factor teórico esperado para un algoritmo cuyo coste por evaluación
+es estrictamente $O(N^2)$ sería $(457/97)^2 \approx 22$.
+Random y SA se aproximan a ese valor ($23\times$ y $21\times$),
+confirmando que su coste está dominado por \texttt{fitness}.
+La BL, en cambio, escala con un factor de $43\times$, sensiblemente mayor.
+La razón es que la BL llama a \texttt{fix} en \emph{cada} vecino generado,
+y con $N=457$ y \texttt{hi}=0{,}02 (máximo 50 activos simultáneos de 457),
+la redistribución de pesos en \texttt{fix} requiere muchas más iteraciones
+para alcanzar la factibilidad, elevando el coste efectivo por evaluación
+por encima del teórico $O(N^2)$.
+
+El Greedy escala con un factor $38\times$ de S\&P 100 a S\&P 500.
+Aunque el greedy solo hace una evaluación, necesita precalcular
+la heurística para cada empresa iterando sobre la fila correspondiente
+de $\Sigma$ ($O(N^2)$ en total), lo que explica su tiempo no nulo en S\&P 500.
+
+\textbf{Eficiencia calidad/tiempo.}
+Una forma de comparar algoritmos con distinto presupuesto temporal es
+la mejora de fitness obtenida por unidad de tiempo.
+En S\&P 500, la BL tarda 199{,}4\,s por semilla y alcanza un fitness de $-0{,}019$,
+mientras que el SA obtiene el mismo fitness en solo 35{,}8\,s, es decir,
+con \textbf{un coste 5{,}6 veces menor}.
+Esto se debe a la diferente estrategia de generación de vecinos:
+la BL construye y baraja los $N(N{-}1) \approx 208\,000$ pares en cada
+iteración ($O(N^2)$ de overhead estructural), mientras que el SA
+selecciona aleatoriamente un par $(origen, destino)$ en $O(1)$,
+utilizando todo el presupuesto en evaluaciones de fitness en lugar de en
+gestión del vecindario.
+
+\textbf{Conclusión sobre eficiencia.}
+Para instancias pequeñas ($N \lesssim 100$) los cuatro algoritmos son
+prácticamente inmediatos y BL y SA ofrecen idéntica calidad.
+Para instancias grandes ($N \sim 500$), el SA es la opción más eficiente:
+iguala la calidad de la BL consumiendo un quinto del tiempo,
+gracias a su generación de vecinos en $O(1)$ frente al $O(N^2)$
+de estructurar el vecindario completo de la BL.
+
+%-----------------------------------------------------------------------
+\begin{thebibliography}{9}
+\bibitem{markowitz1952} H.~Markowitz, ``Portfolio selection,''
+  \textit{Journal of Finance}, vol.~7, no.~1, pp.~77--91, 1952.
+
+\bibitem{kirkpatrick1983} S.~Kirkpatrick, C.~D.~Gelatt, and M.~P.~Vecchi,
+  ``Optimization by simulated annealing,''
+  \textit{Science}, vol.~220, no.~4598, pp.~671--680, 1983.
+
+\bibitem{random_hpp} E.~Konkov, \textit{random.hpp: A C++11/14/17 header-only
+  random number generator library}, GitHub, 2018.
+\end{thebibliography}
+
+\end{document}
