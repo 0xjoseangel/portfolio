@@ -3,14 +3,11 @@
 #define LOCALSEARCH_H
 
 #include "../common/mh.h"
-#include "./portfolioProblem.h"
-#include <limits>
 
 template <typename tDomain> class LocalSearch : public MH<tDomain> {
 private:
-  std::vector<std::pair<int, int>> P;
-
-  void generatePairs(int N) {
+  std::vector<std::pair<int, int>> generatePairs(int N) {
+    std::vector<std::pair<int, int>> P;
     P.reserve(N * (N - 1));
 
     for (int i = 0; i < N; ++i) {
@@ -21,6 +18,8 @@ private:
         }
       }
     }
+
+    return P;
   }
 
 public:
@@ -31,7 +30,7 @@ public:
   // con los linkers...
   ResultMH<tDomain> optimize(Problem<tDomain> &problem, int maxevals) override {
     int N = problem.getSolutionSize();
-    generatePairs(N);
+    auto P = generatePairs(N);
 
     auto solucion_actual = problem.createSolution();
     double fitness_actual = problem.fitness(solucion_actual);

@@ -2,6 +2,7 @@
 #define SIMULATED_ANNEALING_H
 
 #include "../common/mh.h"
+#include <algorithm>
 #include <cmath>
 #include <vector>
 
@@ -77,13 +78,13 @@ public:
     // Si el usuario dejó T0 en 0, auto-calibramos
     double T = (T0 > 0.0) ? T0 : calibrateT0(problem);
 
-    for (int evals = 1; evals < maxevals; ++evals) {
-      // Construimos lista de empresas con peso > 0 (solo pueden ser "origen")
-      std::vector<int> activas;
-      for (int k = 0; k < N; ++k)
-        if (sol[k] > 0.0)
-          activas.push_back(k);
+    // Construimos la lista de activas una vez y la actualizamos incrementalmente
+    std::vector<int> activas;
+    for (int k = 0; k < N; ++k)
+      if (sol[k] > 0.0)
+        activas.push_back(k);
 
+    for (int evals = 1; evals < maxevals; ++evals) {
       // Elegimos origen (empresa con peso) y destino (cualquier otra)
       int origen = activas[Random::get(0, (int)activas.size() - 1)];
       int destino;
@@ -103,8 +104,18 @@ public:
 
       // Aceptamos siempre si mejora; si empeora, con probabilidad exp(delta/T)
       if (delta > 0.0 || Random::get(0.0, 1.0) < std::exp(delta / T)) {
+        // Actualizar activas si destino pasa de 0 a activo, u origen a 0
+        bool destino_era_cero = (sol[destino] == 0.0);
+        bool origen_queda_cero = (vecino[origen] == 0.0);
+
         sol = vecino;
         fit = fit_vecino;
+
+        if (destino_era_cero && sol[destino] > 0.0)
+          activas.push_back(destino);
+        if (origen_queda_cero)
+          activas.erase(std::find(activas.begin(), activas.end(), origen));
+
         if (fit > best_fit) {
           best_fit = fit;
           best_sol = sol;

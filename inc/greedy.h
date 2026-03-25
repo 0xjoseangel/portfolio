@@ -13,21 +13,10 @@ private:
   double lambda;
   std::vector<double> benefit_factors;
 
-  double calculate_heur(Problem<tDomain> &problem, int companie) {
-    // 1. Desenmascaramos al padre y lo convertimos en puntero al hijo
-    PortfolioProblem *p_prob = dynamic_cast<PortfolioProblem *>(&problem);
-
-    // 2. Ahora usamos p_prob-> en lugar de problem.
-    covariance = p_prob->getCovariance();
-    lambda = p_prob->getLambda();
-    benefit_factors = p_prob->getBenefitFactors();
-
+  double calculate_heur(int companie, int N) {
     double heuristica_companie = benefit_factors[companie];
     double suma_covarianzas = 0.0;
 
-    // Aquí el guion dividía entre N, así que usamos p_prob->getSolutionSize()
-    // que es la N
-    int N = p_prob->getSolutionSize();
     for (int j = 0; j < N; ++j) {
       suma_covarianzas += covariance[companie][j];
     }
@@ -47,10 +36,16 @@ public:
     int N = problem.getSolutionSize();
     auto [lo, hi] = problem.getSolutionDomainRange();
 
+    // Cargamos los datos una sola vez antes del bucle
+    PortfolioProblem *p_prob = dynamic_cast<PortfolioProblem *>(&problem);
+    covariance = p_prob->getCovariance();
+    lambda = p_prob->getLambda();
+    benefit_factors = p_prob->getBenefitFactors();
+
     std::vector<std::pair<double, int>> empresas_heur;
 
     for (int i = 0; i < N; ++i) {
-      double heur = calculate_heur(problem, i);
+      double heur = calculate_heur(i, N);
       empresas_heur.push_back({heur, i});
     }
 
@@ -72,6 +67,7 @@ public:
       idx_lista++;
     }
 
+    problem.fix(solucion);
     double fitness = problem.fitness(solucion);
 
     return {solucion, fitness, 1};
