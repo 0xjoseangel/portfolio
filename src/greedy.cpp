@@ -1,4 +1,5 @@
 #include "greedy.h"
+#include "portfolioProblem.h"
 #include <algorithm>
 #include <limits>
 

@@ -71,7 +71,8 @@
     \textbf{Nombre:}  & Jose Angel Carretero Montes \\[4pt]
     \textbf{DNI:}     & 25628892S \\[4pt]
     \textbf{Email:}   & \texttt{joseangel1@correo.ugr.es} \\[4pt]
-    \textbf{Grupo:}   & Grupo 3 \\
+    \textbf{Grupo:}   & Grupo 3 \\[4pt]
+    \textbf{Horario:} & Martes 15:30--17:30 \\
   \end{tabular}
   \vspace{1.5cm}
 \end{titlepage}
@@ -223,10 +224,12 @@ $w \leftarrow \mathbf{0}$;\quad $suma \leftarrow 0$\;
 \Mientras{$suma < 1 - \varepsilon$ \textbf{y} quedan empresas en \textit{companies}}{
   $c \leftarrow$ primera empresa de \textit{companies}\;
   Eliminar $c$ de \textit{companies}\;
-  $w[c] \leftarrow \min(hi,\; 1 - suma)$\;
+  $resto \leftarrow 1 - suma$\;
+  \Si{$resto < lo$}{\textbf{romper}\tcp*{no se puede añadir más sin violar $lo$}}
+  $w[c] \leftarrow \min(hi,\; resto)$\;
   $suma \leftarrow suma + w[c]$\;
 }
-\fix{$w$}\;
+\fix{$w$}\tcp*{redistribuye si quedan restos por rounding}
 \KwReturn{$w$}
 \end{algorithm}
 
@@ -315,9 +318,6 @@ portfolio/
     randomSearch.cpp        # Implementación búsqueda aleatoria
     greedy.cpp              # Implementación greedy
     localsearch.cpp         # Implementación búsqueda local
-  test/
-    portfolio_test.cpp      # Tests unitarios del problema
-    portfolioProblem_test.cpp # Tests de integración
 \end{verbatim}
 
 \subsection{Compilación}
@@ -331,15 +331,20 @@ make
 
 \subsection{Ejecución}
 
-El ejecutable \texttt{main} no requiere argumentos. Ejecuta los tres algoritmos
-sobre los tres conjuntos de datos con 50 semillas cada uno, imprime las tablas
-de medias por pantalla y genera los ficheros CSV para boxplot:
+El ejecutable \texttt{main} acepta opcionalmente dos parámetros:
 
 \begin{verbatim}
-./main
+./main [max_evals] [n_seeds]
 \end{verbatim}
 
-Al terminar se generan en el directorio raíz:
+\noindent Ejemplos de ejecución:
+\begin{verbatim}
+./main                  # valores por defecto: 10000 evaluaciones, 50 semillas
+./main 5000             # 5000 evaluaciones, 50 semillas
+./main 10000 30         # 10000 evaluaciones, 30 semillas
+\end{verbatim}
+
+Imprime las tablas de medias por pantalla y genera los ficheros CSV:
 \texttt{results\_ibex\_35.csv}, \texttt{results\_syp\_100.csv},
 \texttt{results\_syp\_500.csv}.
 
@@ -349,10 +354,8 @@ Para generar los boxplots (requiere Python con \texttt{pandas} y \texttt{seaborn
 python3 boxplot.py
 \end{verbatim}
 
-Los parámetros configurables en \texttt{main.cpp} son \texttt{N\_SEEDS} (número
-de semillas, por defecto 50) y \texttt{MAX\_EVALS} (presupuesto de evaluaciones,
-por defecto 10\,000). Las semillas utilizadas son $1, 2, \ldots, 50$, iguales
-para todos los algoritmos y conjuntos de datos.
+Las semillas utilizadas son $1, 2, \ldots, \texttt{n\_seeds}$, iguales
+para todos los algoritmos y conjuntos de datos, garantizando comparaciones justas.
 
 %-----------------------------------------------------------------------
 \section{Experimentos y Resultados}

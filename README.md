@@ -42,9 +42,6 @@ portfolio/
 │   ├── greedy.cpp             # Implementación del greedy
 │   ├── localsearch.cpp        # Implementación de la BL
 │   └── randomSearch.cpp       # Implementación de la búsqueda aleatoria
-├── test/
-│   ├── portfolio_test.cpp     # Tests unitarios (solución, fix, fitness)
-│   └── portfolioProblem_test.cpp  # Tests de integración del problema
 └── data/
     ├── ibex_35.csv            # 30 empresas IBEX 35, 2015-2025
     ├── syp_100.csv            # 97 empresas S&P 100, 2015-2025
@@ -60,14 +57,6 @@ Desde el directorio raíz del proyecto:
 ```bash
 cmake .
 make
-```
-
-Esto genera el ejecutable `main` y el ejecutable de tests `all_tests`.
-
-Para ejecutar los tests unitarios:
-
-```bash
-./all_tests
 ```
 
 ---

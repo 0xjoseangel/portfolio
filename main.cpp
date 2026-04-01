@@ -13,8 +13,10 @@
 
 using namespace std;
 
-const int N_SEEDS   = 50;
-const int MAX_EVALS = 10000;
+// Valores por defecto; se pueden cambiar con argumentos de línea de comandos:
+//   ./main [max_evals] [n_seeds]
+int N_SEEDS   = 50;
+int MAX_EVALS = 10000;
 
 struct RunResult {
   double fitness_train;
@@ -101,7 +103,10 @@ void writeBoxplotCSV(const string &filename,
   cout << "CSV boxplot escrito en: " << filename << "\n";
 }
 
-int main() {
+int main(int argc, char* argv[]) {
+  if (argc > 1) MAX_EVALS = stoi(argv[1]);
+  if (argc > 2) N_SEEDS   = stoi(argv[2]);
+
   // Semillas compartidas para todos los algoritmos
   vector<long> seeds(N_SEEDS);
   for (int i = 0; i < N_SEEDS; ++i) seeds[i] = i + 1;
