@@ -108,7 +108,7 @@ Dado un vector de pesos $w = (w_1,\ldots,w_N)$, la calidad de la cartera se mide
 \]
 donde:
 \[
-  \text{Beneficio}(w) = \sum_{i=1}^{N} w_i \cdot \frac{1}{T}\sum_{t=1}^{T}\log(1+\mu_{ti})
+  \text{Beneficio}(w) = \sum_{i=1}^{N} w_i \cdot \sum_{t=1}^{T}\log(1+\mu_{ti})
   \qquad
   \text{Riesgo}(w) = \sum_{i=1}^{N}\sum_{j=1}^{N} w_i \cdot \Sigma_{ij} \cdot w_j
 \]
@@ -170,7 +170,7 @@ El operador de reparación actúa en tres fases:
 \subsection{Precómputo de matrices}
 
 Para acelerar la evaluación, se precalculan antes de ejecutar los algoritmos:
-el vector de factores de beneficio $b_i = \frac{1}{T}\sum_t \log(1+\mu_{ti})$
+el vector de factores de beneficio $b_i = \sum_t \log(1+\mu_{ti})$
 y la matriz de covarianza $\Sigma$, tanto para los datos de entrenamiento (2015--2024)
 como para los de test (2025). Así, \texttt{fitness} se calcula en $O(N^2)$.
 
@@ -226,6 +226,7 @@ $w \leftarrow \mathbf{0}$;\quad $suma \leftarrow 0$\;
   $w[c] \leftarrow \min(hi,\; 1 - suma)$\;
   $suma \leftarrow suma + w[c]$\;
 }
+\fix{$w$}\;
 \KwReturn{$w$}
 \end{algorithm}
 
@@ -281,56 +282,6 @@ $mejora \leftarrow \text{verdadero}$\;
 cada iteración para evitar sesgos de orden. La condición de parada es la convergencia
 (ninguna mejora en un recorrido completo) o el agotamiento del presupuesto.
 
-\subsection{Simulated Annealing (SA) --- Trabajo voluntario}
-
-El Recocido Simulado extiende la búsqueda local aceptando soluciones peores con
-probabilidad $e^{\Delta f / T}$, lo que permite escapar de óptimos locales.
-La temperatura $T$ decrece geométricamente ($T \leftarrow T \cdot \alpha$),
-lo que crea una transición natural de exploración (alta $T$) a explotación (baja $T$).
-
-\subsubsection*{Calibración automática de temperatura}
-
-En lugar de fijar $T_0$ manualmente, se estima automáticamente realizando 200
-movimientos aleatorios, calculando el empeoramiento medio $\overline{\Delta}$
-de los movimientos que empeoran, y fijando:
-\[
-  T_0 = \frac{-\overline{\Delta}}{\ln(0{,}8)}
-\]
-de modo que al inicio se acepta aproximadamente el 80\,\% de los movimientos
-que empeoran, garantizando exploración amplia independientemente de la escala
-del problema.
-
-\subsubsection*{Operador de vecino}
-
-Se elige aleatoriamente una empresa \textit{origen} con peso positivo y una empresa
-\textit{destino} cualquiera distinta. Se transfiere una fracción aleatoria
-$\delta \in [0{,}1, 0{,}9]$ del peso del origen al destino, seguida de \fix{}.
-La aleatoriedad de $\delta$ proporciona mayor diversidad que el ratio fijo de la BL.
-
-\begin{algorithm}[H]
-\caption{Simulated Annealing}
-\KwIn{problema, maxEvals, $\alpha = 0{,}999$}
-\KwOut{mejor solución encontrada}
-$T \leftarrow$ calibrar$T_0$(problema)\;
-$s \leftarrow$ \createSolution{};\quad $f \leftarrow$ \fitness{$s$}\;
-$s^* \leftarrow s$;\quad $f^* \leftarrow f$\;
-\Para{$evals \leftarrow 1$ \KwTo $maxEvals - 1$}{
-  $activas \leftarrow \{i : s[i] > 0\}$\;
-  $origen \leftarrow$ aleatorio en $activas$\;
-  $destino \leftarrow$ aleatorio en $\{1,\ldots,N\} \setminus \{origen\}$\;
-  $s' \leftarrow s$;\quad
-  $\delta \leftarrow$ uniforme$(0{,}1,\; 0{,}9)$\;
-  $s'[origen] \mathrel{-}= \delta \cdot s[origen]$;\quad
-  $s'[destino] \mathrel{+}= \delta \cdot s[origen]$\;
-  \fix{$s'$};\quad $f' \leftarrow$ \fitness{$s'$}\;
-  \Si{$f' > f$ \textbf{o} $\text{aleatorio}(0,1) < e^{(f'-f)/T}$}{
-    $s \leftarrow s'$;\quad $f \leftarrow f'$\;
-    \Si{$f > f^*$}{$s^* \leftarrow s$;\quad $f^* \leftarrow f$\;}
-  }
-  $T \leftarrow T \cdot \alpha$\;
-}
-\KwReturn{$s^*$}
-\end{algorithm}
 
 %-----------------------------------------------------------------------
 \section{Estructura del Código y Manual de Usuario}
@@ -341,8 +292,9 @@ $s^* \leftarrow s$;\quad $f^* \leftarrow f$\;
 \begin{verbatim}
 portfolio/
   main.cpp                  # Punto de entrada, experimentos de 50 semillas
-  CMakeLists.txt            # Sistema de construcción
-  boxplot.py                # Script Python para gráficas de cajas
+  CMakeLists.txt            # Sistema de construcción (CMake)
+  boxplot.py                # Script Python para boxplots (pandas + seaborn)
+  README.md                 # Manual de usuario y descripción del proyecto
   data/
     ibex_35.csv             # 30 empresas IBEX 35, 2015-2025
     syp_100.csv             # 97 empresas S&P 100, 2015-2025
@@ -352,34 +304,39 @@ portfolio/
     problem.h               # Interfaz genérica Problem<tDomain>
     solution.h              # Typedefs tSolution, tFitness
     random.hpp              # Generador pseudoaleatorio de alta calidad
+    util.h                  # Utilidades auxiliares
   inc/
-    portfolioProblem.h      # Declaración del problema
+    portfolioProblem.h      # Declaración del problema de portfolio
     randomSearch.h          # Algoritmo aleatorio
     greedy.h                # Algoritmo greedy
-    localsearch.h           # Búsqueda local
-    simulatedAnnealing.h    # Simulated Annealing (voluntario)
+    localsearch.h           # Búsqueda local (primero mejor)
   src/
-    portfolioProblem.cpp    # Implementación: carga datos, matrices, fitness
+    portfolioProblem.cpp    # Carga de datos, precómputo, fitness, fix
+    randomSearch.cpp        # Implementación búsqueda aleatoria
+    greedy.cpp              # Implementación greedy
+    localsearch.cpp         # Implementación búsqueda local
+  test/
+    portfolio_test.cpp      # Tests unitarios del problema
+    portfolioProblem_test.cpp # Tests de integración
 \end{verbatim}
 
 \subsection{Compilación}
 
+Desde el directorio raíz del proyecto:
+
 \begin{verbatim}
-mkdir build && cd build
-cmake ..
-cmake --build .
+cmake .
+make
 \end{verbatim}
 
 \subsection{Ejecución}
 
-El ejecutable \texttt{main} no requiere argumentos. Ejecuta automáticamente los
-cuatro algoritmos sobre los tres conjuntos de datos con 50 semillas cada uno,
-imprime las tablas de medias por pantalla y genera los ficheros CSV para boxplot:
+El ejecutable \texttt{main} no requiere argumentos. Ejecuta los tres algoritmos
+sobre los tres conjuntos de datos con 50 semillas cada uno, imprime las tablas
+de medias por pantalla y genera los ficheros CSV para boxplot:
 
 \begin{verbatim}
-cd build
-cmake --build . && cd ..
-./build/main
+./main
 \end{verbatim}
 
 Al terminar se generan en el directorio raíz:
@@ -417,7 +374,7 @@ para todos los algoritmos y conjuntos de datos.
 \end{center}
 
 Parámetros comunes: $\lambda = 500$, \texttt{MAX\_EVALS} $= 10\,000$,
-50 semillas ($1$--$50$), $\alpha_{\text{SA}} = 0{,}999$.
+50 semillas ($1$--$50$).
 
 \subsection{Resultados}
 
@@ -426,45 +383,42 @@ Greedy es siempre el mismo al ser determinista.
 
 \begin{table}[H]
 \centering
-\caption{Resultados IBEX 35 (medias, 50 semillas)}
+\caption{Resultados IBEX 35 --- $N=30$, $T=2559$, $[lo,hi]=[0.005, 0.08]$ (medias, 50 semillas)}
 \begin{tabular}{lrrrrr}
 \toprule
 \textbf{Algoritmo} & \textbf{Fit.\ 2015--24} & \textbf{Fit.\ 2025} & \textbf{Ben.\ 2025} & \textbf{Evals} & \textbf{Tiempo (s)} \\
 \midrule
-Greedy  & $-0.032$ & $-0.019$ & $-0.000$ & $1$         & $0.000$ \\
-Random  & $-0.033$ & $-0.022$ & $0.000$  & $10\,000$   & $0.282$ \\
-BL      & $-0.030$ & $-0.019$ & $-0.000$ & $10\,000$   & $0.259$ \\
-SA      & $-0.030$ & $-0.019$ & $0.000$  & $10\,000$   & $0.187$ \\
+Greedy  & $-0.213$ & $0.091$  & $0.115$  & $1$         & $0.000$ \\
+Random  & $-0.583$ & $0.091$  & $0.118$  & $10\,000$   & $0.283$ \\
+BL      & $-0.213$ & $0.091$  & $0.115$  & $1\,852$    & $0.034$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{table}[H]
 \centering
-\caption{Resultados S\&P 100 (medias, 50 semillas)}
+\caption{Resultados S\&P 100 --- $N=97$, $T=2516$, $[lo,hi]=[0.005, 0.05]$ (medias, 50 semillas)}
 \begin{tabular}{lrrrrr}
 \toprule
 \textbf{Algoritmo} & \textbf{Fit.\ 2015--24} & \textbf{Fit.\ 2025} & \textbf{Ben.\ 2025} & \textbf{Evals} & \textbf{Tiempo (s)} \\
 \midrule
-Greedy  & $-0.025$ & $-0.031$ & $0.000$  & $1$         & $0.001$ \\
-Random  & $-0.026$ & $-0.033$ & $0.000$  & $10\,000$   & $1.913$ \\
-BL      & $-0.022$ & $-0.027$ & $0.000$  & $10\,000$   & $4.634$ \\
-SA      & $-0.022$ & $-0.027$ & $0.000$  & $10\,000$   & $1.701$ \\
+Greedy  & $0.867$  & $-0.041$ & $0.010$  & $1$         & $0.000$ \\
+Random  & $0.434$  & $0.007$  & $0.052$  & $10\,000$   & $1.859$ \\
+BL      & $0.867$  & $-0.039$ & $0.011$  & $10\,000$   & $1.702$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
 \begin{table}[H]
 \centering
-\caption{Resultados S\&P 500 (medias, 50 semillas)}
+\caption{Resultados S\&P 500 --- $N=457$, $T=2516$, $[lo,hi]=[0.005, 0.02]$ (medias, 50 semillas)}
 \begin{tabular}{lrrrrr}
 \toprule
 \textbf{Algoritmo} & \textbf{Fit.\ 2015--24} & \textbf{Fit.\ 2025} & \textbf{Ben.\ 2025} & \textbf{Evals} & \textbf{Tiempo (s)} \\
 \midrule
-Greedy  & $-0.026$ & $-0.031$ & $0.000$  & $1$         & $0.038$ \\
-Random  & $-0.028$ & $-0.039$ & $0.000$  & $10\,000$   & $42.966$ \\
-BL      & $-0.019$ & $-0.028$ & $0.000$  & $10\,000$   & $199.447$ \\
-SA      & $-0.019$ & $-0.027$ & $0.000$  & $10\,000$   & $35.846$ \\
+Greedy  & $1.043$  & $-0.116$ & $-0.063$ & $1$         & $0.005$ \\
+Random  & $0.241$  & $-0.039$ & $0.006$  & $10\,000$   & $43.226$ \\
+BL      & $0.949$  & $-0.099$ & $-0.048$ & $10\,000$   & $41.477$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -499,124 +453,130 @@ fitness de entrenamiento en las 50 ejecuciones para cada conjunto de datos.
 \section{Análisis de Resultados}
 %-----------------------------------------------------------------------
 
-\subsection{Calidad de las soluciones}
+\subsection{Calidad en entrenamiento}
 
-\textbf{BL supera claramente a Random y Greedy.} En ambos conjuntos con datos
-completos (IBEX 35 y S\&P 100), la búsqueda local obtiene un fitness
-aproximadamente un 11\,\% mejor que el algoritmo aleatorio y un 7\,\% mejor que
-el greedy. Esto confirma que explotar la estructura local del espacio de búsqueda
-es efectivo para este problema.
+\textbf{Greedy y BL empatan en IBEX 35.}
+Ambos obtienen el mismo fitness de entrenamiento ($-0{,}213$) y el mismo
+resultado en 2025, lo que indica que el greedy construye directamente el
+óptimo local al que converge la BL.
+Esto se confirma en el número de evaluaciones: la BL usa solo $1\,852$ de
+las $10\,000$ disponibles antes de agotar el vecindario sin encontrar mejora,
+lo que significa que parte de una solución aleatoria y en menos de 2\,000
+movimientos ya ha llegado a un óptimo local de calidad idéntica a la del greedy.
 
-\textbf{El greedy ofrece una solución de calidad razonable con una única evaluación.}
-Con solo 1 evaluación frente a las 10\,000 del resto, la heurística basada en
-beneficio menos covarianza media supera al algoritmo aleatorio, lo que demuestra
-que la función heurística captura información relevante del problema.
+\textbf{S\&P 100: Greedy y BL prácticamente idénticos.}
+Con $N=97$, la BL mejora el fitness del greedy solo en $0{,}0001$ usando
+las $10\,000$ evaluaciones completas.
+La diferencia es tan pequeña que puede atribuirse a que la BL parte de una
+solución aleatoria y aún no ha convergido al mismo óptimo local que el greedy.
 
-\textbf{SA y BL convergen a resultados prácticamente idénticos en IBEX 35 y S\&P 100.}
-Esto se explica porque con $N$ pequeño (30 y 97 empresas) la BL ya es capaz de
-recorrer el vecindario ($N(N{-}1)$ vecinos) en pocas iteraciones antes de agotar
-el presupuesto, alcanzando óptimos locales de calidad comparable a los que
-encuentra el SA.
+\textbf{S\&P 500: Greedy supera a BL en entrenamiento ($1{,}043$ vs $0{,}949$).}
+Este resultado, a primera vista sorprendente, se explica por el tamaño del
+vecindario: con $N=457$ hay $457 \times 456 = 208\,392$ pares posibles.
+En un presupuesto de $10\,000$ evaluaciones, la BL solo puede explorar menos
+del $5\,\%$ del vecindario antes de agotarlos.
+Partiendo de una solución aleatoria de baja calidad ($\sim 0{,}241$ como
+muestra Random), la BL asciende cuanto puede, pero no llega al nivel que
+alcanza el greedy usando información global (beneficio acumulado y covarianza
+media) para construir su solución en un único paso.
+Esto ilustra que para instancias grandes, una heurística bien diseñada puede
+superar a la búsqueda local cuando el presupuesto de evaluaciones es pequeño
+en relación al tamaño del espacio.
 
-\textbf{SA muestra mayor ventaja en S\&P 500 ($N=457$).} Con un vecindario de
-457\,$\times$\,456\,$\approx$\,208\,000 pares, la BL apenas puede completar
-un recorrido completo en 10\,000 evaluaciones y queda atrapada en el primer
-óptimo local encontrado. El SA, al aceptar soluciones peores con probabilidad
-controlada por la temperatura, puede escapar de esos óptimos y explorar regiones
-más prometedoras del espacio.
+Random es consistentemente el peor en entrenamiento en los tres conjuntos,
+lo que era esperable: generar $10\,000$ soluciones aleatorias sin explotar la
+estructura del problema es la referencia inferior.
 
-\subsection{Variabilidad}
+\subsection{Generalización (datos de 2025)}
 
-La BL presenta muy baja varianza entre semillas en los tres conjuntos (los
-boxplots muestran cajas estrechas), lo que indica que el vecindario es suficiente
-para guiar la búsqueda hacia zonas similares independientemente del punto de
-partida. El SA hereda esta estabilidad y en S\&P 500 converge consistentemente
-a valores de fitness similares entre semillas, algo que la BL no logra dado que
-su resultado depende en mayor medida del punto inicial.
+El comportamiento en test revela un fenómeno notable de \textbf{sobreajuste
+progresivo} con el tamaño del problema:
 
-El algoritmo aleatorio presenta la mayor varianza, especialmente en S\&P 500
-donde el espacio de búsqueda es enorme y 10\,000 muestras aleatorias cubren
-una fracción ínfima de él.
+\begin{itemize}
+  \item \textbf{IBEX 35}: todos los algoritmos generalizan bien.
+    Fitness de 2025 positivo ($\approx 0{,}091$) y beneficio positivo
+    ($\approx 0{,}115$--$0{,}118$) para los tres, sin diferencias relevantes.
 
-\subsection{Coste computacional y escalabilidad}
+  \item \textbf{S\&P 100}: Greedy y BL presentan fitness negativo en 2025
+    ($-0{,}041$ y $-0{,}039$), mientras que \textbf{Random obtiene el único
+    fitness positivo} ($+0{,}007$) y un beneficio bruto casi
+    cinco veces mayor ($0{,}052$ frente a $0{,}010$--$0{,}011$).
 
-\textbf{Coste por evaluación.}
-La operación dominante es el cálculo de \texttt{fitness}, que requiere
-$O(N^2)$ multiplicaciones (producto $w^\top \Sigma w$).
-El operador \texttt{fix} añade un coste $O(N)$ por llamada, pero se vuelve
-relevante cuando $N$ es grande y el proceso de redistribución de pesos necesita
-más iteraciones para converger.
+  \item \textbf{S\&P 500}: los tres algoritmos tienen fitness negativo en 2025,
+    y Greedy y BL incluso pierden dinero en bruto (beneficio $-0{,}063$ y
+    $-0{,}048$ respectivamente), mientras que Random logra un beneficio
+    marginalmente positivo ($+0{,}006$).
+\end{itemize}
 
-\textbf{Escalado empírico con $N$.}
-La Tabla~\ref{tab:tiempos} recoge los tiempos medios por semilla de cada algoritmo.
-Tomando S\&P 100 como referencia y comparando con S\&P 500
-($N$ crece un factor $457/97 \approx 4{,}7$):
+La razón por la que Random generaliza mejor que los algoritmos más
+sofisticados es contraintuitiva pero estructural: el greedy y la BL
+construyen portfolios fuertemente optimizados para la covarianza de 2015--2024.
+Esto los lleva a concentrarse en activos con bajo riesgo relativo histórico, que
+en 2025 (un año con condiciones de mercado distintas) resultaron ser peores.
+Random, al no explotar esa estructura, genera portfolios más diversificados que
+no dependen de patrones históricos específicos y por eso transfieren mejor.
+
+\subsection{Variabilidad entre semillas}
+
+Como es determinista, el \textbf{Greedy produce exactamente el mismo resultado}
+en las 50 ejecuciones (misma solución, mismo fitness).
+El boxplot del greedy es por tanto un único punto.
+
+La \textbf{BL en IBEX 35} presenta también variabilidad muy baja:
+parte de puntos distintos pero converge al mismo óptimo local
+(mismo fitness medio que el greedy), con pequeñas variaciones debidas al orden
+de exploración.
+En S\&P 100 y S\&P 500, la BL no converge antes del presupuesto,
+por lo que su resultado final depende en mayor medida del punto de partida;
+la varianza es moderada.
+
+\textbf{Random} presenta la mayor varianza en los tres conjuntos,
+especialmente pronunciada en S\&P 500 donde el espacio es enorme y
+$10\,000$ muestras representan una fracción ínfima.
+
+\subsection{Coste computacional}
+
+\textbf{Dominancia de \texttt{fitness}.}
+Cada evaluación de fitness requiere $O(N^2)$ operaciones (producto $w^\top\Sigma w$).
+Con $10\,000$ evaluaciones, el coste total por semilla es $O(10\,000 \cdot N^2)$.
 
 \begin{table}[H]
 \centering
-\caption{Tiempo medio por semilla (segundos) y factor de escala respecto a S\&P 100}
+\caption{Tiempo medio por semilla (s) y factor de escala S\&P~100 $\to$ S\&P~500}
 \label{tab:tiempos}
-\begin{tabular}{lrrrrrr}
+\begin{tabular}{lrrrrr}
 \toprule
- & \multicolumn{2}{c}{\textbf{IBEX 35} ($N=30$)}
- & \multicolumn{2}{c}{\textbf{S\&P 100} ($N=97$)}
- & \multicolumn{2}{c}{\textbf{S\&P 500} ($N=457$)} \\
-\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}
-\textbf{Alg.} & t (s) & ×100 & t (s) & ref. & t (s) & ×100 \\
+ & \textbf{IBEX~35} ($N=30$)
+ & \textbf{S\&P~100} ($N=97$)
+ & \textbf{S\&P~500} ($N=457$)
+ & \textbf{Factor} & \textbf{Teórico} \\
 \midrule
-Greedy & $0.000$ & ---    & $0.001$ & $1\times$  & $0.038$ & $38\times$ \\
-Random & $0.006$ & $0.3\times$ & $0.038$ & $1\times$  & $0.859$ & $23\times$ \\
-BL     & $0.005$ & $0.1\times$ & $0.093$ & $1\times$  & $3.989$ & $43\times$ \\
-SA     & $0.004$ & $0.2\times$ & $0.034$ & $1\times$  & $0.717$ & $21\times$ \\
+Greedy & $< 0{,}001$ & $< 0{,}001$ & $0{,}0001$ & --- & --- \\
+Random & $0{,}006$   & $0{,}037$   & $0{,}865$  & $23{,}4\times$ & $(4{,}7)^2 \approx 22$ \\
+BL     & $0{,}001$   & $0{,}034$   & $0{,}830$  & $24{,}4\times$ & $22$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-\noindent El factor teórico esperado para un algoritmo cuyo coste por evaluación
-es estrictamente $O(N^2)$ sería $(457/97)^2 \approx 22$.
-Random y SA se aproximan a ese valor ($23\times$ y $21\times$),
-confirmando que su coste está dominado por \texttt{fitness}.
-La BL, en cambio, escala con un factor de $43\times$, sensiblemente mayor.
-La razón es que la BL llama a \texttt{fix} en \emph{cada} vecino generado,
-y con $N=457$ y \texttt{hi}=0{,}02 (máximo 50 activos simultáneos de 457),
-la redistribución de pesos en \texttt{fix} requiere muchas más iteraciones
-para alcanzar la factibilidad, elevando el coste efectivo por evaluación
-por encima del teórico $O(N^2)$.
+Random y BL escalan de forma casi idéntica ($23$--$24\times$) y consistente
+con el factor teórico $O(N^2)$ de $(457/97)^2 \approx 22$.
+En S\&P 500 ambos hacen las $10\,000$ evaluaciones completas,
+dominadas por \texttt{fitness}; la diferencia de tiempo ($43{,}2$ s frente a
+$41{,}5$ s totales) es marginal.
 
-El Greedy escala con un factor $38\times$ de S\&P 100 a S\&P 500.
-Aunque el greedy solo hace una evaluación, necesita precalcular
-la heurística para cada empresa iterando sobre la fila correspondiente
-de $\Sigma$ ($O(N^2)$ en total), lo que explica su tiempo no nulo en S\&P 500.
+Destaca que \textbf{la BL en IBEX 35 es 6 veces más rápida que Random}
+($1\,852$ evaluaciones frente a $10\,000$): la convergencia temprana
+reduce el coste real a solo un $18\,\%$ del presupuesto.
 
-\textbf{Eficiencia calidad/tiempo.}
-Una forma de comparar algoritmos con distinto presupuesto temporal es
-la mejora de fitness obtenida por unidad de tiempo.
-En S\&P 500, la BL tarda 199{,}4\,s por semilla y alcanza un fitness de $-0{,}019$,
-mientras que el SA obtiene el mismo fitness en solo 35{,}8\,s, es decir,
-con \textbf{un coste 5{,}6 veces menor}.
-Esto se debe a la diferente estrategia de generación de vecinos:
-la BL construye y baraja los $N(N{-}1) \approx 208\,000$ pares en cada
-iteración ($O(N^2)$ de overhead estructural), mientras que el SA
-selecciona aleatoriamente un par $(origen, destino)$ en $O(1)$,
-utilizando todo el presupuesto en evaluaciones de fitness en lugar de en
-gestión del vecindario.
-
-\textbf{Conclusión sobre eficiencia.}
-Para instancias pequeñas ($N \lesssim 100$) los cuatro algoritmos son
-prácticamente inmediatos y BL y SA ofrecen idéntica calidad.
-Para instancias grandes ($N \sim 500$), el SA es la opción más eficiente:
-iguala la calidad de la BL consumiendo un quinto del tiempo,
-gracias a su generación de vecinos en $O(1)$ frente al $O(N^2)$
-de estructurar el vecindario completo de la BL.
+El \textbf{Greedy} es el más eficiente con diferencia: su coste es $O(N^2)$
+por el precómputo de heurísticas, pero solo requiere una única
+evaluación de fitness, resultando en tiempos despreciables incluso para
+$N=457$.
 
 %-----------------------------------------------------------------------
 \begin{thebibliography}{9}
 \bibitem{markowitz1952} H.~Markowitz, ``Portfolio selection,''
   \textit{Journal of Finance}, vol.~7, no.~1, pp.~77--91, 1952.
-
-\bibitem{kirkpatrick1983} S.~Kirkpatrick, C.~D.~Gelatt, and M.~P.~Vecchi,
-  ``Optimization by simulated annealing,''
-  \textit{Science}, vol.~220, no.~4598, pp.~671--680, 1983.
 
 \bibitem{random_hpp} E.~Konkov, \textit{random.hpp: A C++11/14/17 header-only
   random number generator library}, GitHub, 2018.

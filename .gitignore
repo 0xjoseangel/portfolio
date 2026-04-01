@@ -1,14 +1,40 @@
-# ── Build ──────────────────────────────────────────────────────────────────
+# ── Ejecutables compilados ──────────────────────────────────────────────────
+main
+all_tests
+
+# ── Artefactos de CMake (build in-source) ───────────────────────────────────
+CMakeCache.txt
+CMakeFiles/
+cmake_install.cmake
+CTestTestfile.cmake
+Makefile
+_deps/
+lib/
+bin/
+*.cmake
+cmake_test_discovery_*.json
+all_tests[*
+
+# ── Build out-of-source ──────────────────────────────────────────────────────
 build/
 
-# ── LSP / clangd ───────────────────────────────────────────────────────────
+# ── Artefactos LaTeX ─────────────────────────────────────────────────────────
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+
+# ── LSP / clangd ─────────────────────────────────────────────────────────────
 compile_commands.json
 .cache/
 
-# ── Datos (ficheros grandes, no se versionan) ───────────────────────────────
+# ── Datos (ficheros grandes, no se versionan) ────────────────────────────────
 data/
 
-# ── Artefactos de compilación ───────────────────────────────────────────────
+# ── Artefactos de compilación C++ ────────────────────────────────────────────
 *.d
 *.o
 *.obj
@@ -24,12 +50,11 @@ data/
 *.a
 *.lib
 *.exe
-*.out
 *.app
 *.mod
 *.smod
 
-# ── Editores ────────────────────────────────────────────────────────────────
+# ── Editores ─────────────────────────────────────────────────────────────────
 .vscode/
 .idea/
 *.swp

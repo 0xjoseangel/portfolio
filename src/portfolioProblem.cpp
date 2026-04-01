@@ -1,5 +1,4 @@
 #include "../inc/portfolioProblem.h"
-#include "../common/random.hpp"
 #include "solution.h"
 #include <fstream>
 #include <iostream>
@@ -65,7 +64,9 @@ void PortfolioProblem::loadData(const std::string &filename) {
     N = returns[0].size();
     T_test = returns_test.size();
   } else {
-    T = 0; N = 0; T_test = 0;
+    T = 0;
+    N = 0;
+    T_test = 0;
     std::cerr << "Advertencia: El archivo " << filename << " estaba vacío."
               << std::endl;
   }
@@ -80,11 +81,13 @@ void PortfolioProblem::precomputeMatrices() {
   for (int i = 0; i < N; ++i) {
     double sum_mu = 0.0, sum_log = 0.0;
     for (int t = 0; t < T; ++t) {
-      sum_mu  += returns[t][i];
+      sum_mu += returns[t][i];
       sum_log += std::log(1.0 + returns[t][i]);
     }
-    means[i]          = sum_mu  / T;
-    benefit_factors[i] = sum_log / T;
+    means[i] = sum_mu / T;
+
+    // El nuevo guion lo calcula sin dividirlo entre T
+    benefit_factors[i] = sum_log;
   }
 
   for (int i = 0; i < N; ++i)
@@ -100,16 +103,18 @@ void PortfolioProblem::precomputeMatrices() {
   benefit_factors_test.assign(N, 0.0);
   covariance_test.assign(N, std::vector<double>(N, 0.0));
 
-  if (T_test == 0) return;
+  if (T_test == 0)
+    return;
 
   for (int i = 0; i < N; ++i) {
     double sum_mu = 0.0, sum_log = 0.0;
     for (int t = 0; t < T_test; ++t) {
-      sum_mu  += returns_test[t][i];
+      sum_mu += returns_test[t][i];
       sum_log += std::log(1.0 + returns_test[t][i]);
     }
-    means_test[i]          = sum_mu  / T_test;
-    benefit_factors_test[i] = sum_log / T_test;
+    means_test[i] = sum_mu / T_test;
+    // El nuevo guion no lo divide entre T
+    benefit_factors_test[i] = sum_log;
   }
 
   for (int i = 0; i < N; ++i)

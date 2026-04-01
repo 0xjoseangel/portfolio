@@ -8,7 +8,6 @@
 #include <problem.h>
 #include <random.hpp>
 #include <randomSearch.h>
-#include <simulatedAnnealing.h>
 #include <string>
 #include <vector>
 
@@ -126,7 +125,6 @@ int main() {
     RandomSearch<double>    ralg;
     Greedy<double>          greedy;
     LocalSearch<double>     ls;
-    SimulatedAnnealing<double> sa;
 
     cout << "Ejecutando Random...";   cout.flush();
     auto res_rand   = runAlgorithm(ralg,   problem, seeds);
@@ -140,15 +138,10 @@ int main() {
     auto res_ls     = runAlgorithm(ls,     problem, seeds);
     cout << " OK\n";
 
-    cout << "Ejecutando SA...";       cout.flush();
-    auto res_sa     = runAlgorithm(sa,     problem, seeds);
-    cout << " OK\n";
-
     vector<pair<string, vector<RunResult>>> alg_results = {
         {"greedy", res_greedy},
         {"random", res_rand},
         {"bl",     res_ls},
-        {"sa",     res_sa},
     };
 
     printTable(ds.name, alg_results);
