@@ -267,11 +267,12 @@ $mejora \leftarrow \text{verdadero}$\;
   \shuffle{$P$}\;
   \Para{cada $(origen, destino) \in P$}{
     \Si{$evals \geq maxEvals$}{\textbf{romper}\;}
-    $s' \leftarrow s$;\quad
-    $s'[origen] \leftarrow s'[origen] \cdot 0{,}6$;\quad
+    $s' \leftarrow s$\;
+    $s'[origen] \leftarrow s'[origen] \cdot 0{,}6$\;
     $s'[destino] \leftarrow s'[destino] + s[origen] \cdot 0{,}4$\;
-    \fix{$s'$};\quad
-    $f' \leftarrow$ \fitness{$s'$};\quad $evals \mathrel{+}= 1$\;
+    \fix{$s'$}\;
+    $f' \leftarrow$ \fitness{$s'$}\;
+    $evals \mathrel{+}= 1$\;
     \Si{$f' > f$}{
       $s \leftarrow s'$;\quad $f \leftarrow f'$;\quad $mejora \leftarrow \text{verdadero}$\;
       \textbf{romper}\;
