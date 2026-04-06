@@ -1,0 +1,108 @@
+Práctica 1 — Metaheurísticas
+Técnicas de Búsqueda Local y Algoritmos Greedy para el Problema de Portfolio
+Autor: Jose Angel Carretero Montes
+Curso: 2025-26
+
+========================================================
+ESTRUCTURA DE FICHEROS
+========================================================
+
+main.cpp
+  Punto de entrada. Ejecuta los 3 algoritmos (Greedy, Random, BL) sobre los
+  3 conjuntos de datos con N semillas. Genera tablas de medias por pantalla
+  y ficheros CSV para boxplots.
+
+CMakeLists.txt
+  Fichero de configuración del sistema de construcción CMake.
+
+boxplot.py
+  Script Python para generar boxplots de los resultados (requiere pandas y seaborn).
+
+LEEME
+  Este fichero.
+
+README.md
+  Manual de usuario detallado (estructura, compilación, ejecución, parámetros).
+
+common/mh.h
+  Interfaz genérica de metaheurística MH<tDomain>. No modificar.
+
+common/problem.h
+  Interfaz genérica de problema Problem<tDomain>. No modificar.
+
+common/solution.h
+  Tipos tSolution<T> y tFitness. No modificar.
+
+common/random.hpp
+  Generador pseudoaleatorio de alta calidad (random.hpp). No modificar.
+
+common/util.h
+  Utilidades auxiliares. No modificar.
+
+inc/portfolioProblem.h
+  Declaración de PortfolioProblem: carga CSV, precómputo de matrices,
+  fitness, fix, createSolution, evaluación sobre datos 2025.
+
+inc/greedy.h
+  Declaración de Greedy<T>: algoritmo greedy basado en heurística
+  beneficio menos covarianza media.
+
+inc/localsearch.h
+  Declaración de LocalSearch<T>: búsqueda local primero-mejor con
+  vecindario de pares (ratio=0.4).
+
+inc/randomSearch.h
+  Declaración de RandomSearch<T>: búsqueda aleatoria pura.
+
+src/portfolioProblem.cpp
+  Implementación completa del problema: carga de datos CSV, separación
+  train/test por año, precómputo de covarianza y factores de beneficio,
+  evaluación de fitness, operador de reparación (fix) y creación de
+  soluciones aleatorias válidas.
+
+src/greedy.cpp
+  Implementación del algoritmo greedy.
+
+src/localsearch.cpp
+  Implementación de la búsqueda local.
+
+src/randomSearch.cpp
+  Implementación de la búsqueda aleatoria.
+
+data/ibex_35.csv
+  Datos de 30 empresas del IBEX 35, periodo 2015-2025.
+
+data/syp_100.csv
+  Datos de 97 empresas del S&P 100, periodo 2015-2025.
+
+data/syp_500.csv
+  Datos de 457 empresas del S&P 500, periodo 2015-2025.
+
+========================================================
+COMPILACIÓN
+========================================================
+
+  cmake .
+  make
+
+Genera el ejecutable ./main en el directorio raíz.
+
+========================================================
+EJECUCIÓN
+========================================================
+
+Uso:
+  ./main [max_evals] [n_seeds]
+
+Ejemplos:
+  ./main                  # valores por defecto: max_evals=10000, n_seeds=50
+  ./main 5000             # 5000 evaluaciones, 50 semillas
+  ./main 10000 30         # 10000 evaluaciones, 30 semillas
+
+Al terminar genera:
+  results_ibex_35.csv
+  results_syp_100.csv
+  results_syp_500.csv
+
+Para generar los boxplots:
+  python3 boxplot.py

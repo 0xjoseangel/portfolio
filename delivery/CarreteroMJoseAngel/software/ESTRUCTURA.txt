@@ -1,0 +1,61 @@
+ESTRUCTURA DE DIRECTORIOS
+=========================
+
+.
+├── main                        Ejecutable compilado
+├── CMakeLists.txt              Configuración CMake
+├── boxplot.py                  Script para boxplots
+├── LEEME                        Documentación breve
+├── ESTRUCTURA.txt              Este fichero
+│
+├── common/                     Cabeceras comunes (sin modificar)
+│   ├── mh.h
+│   ├── problem.h
+│   ├── random.hpp
+│   ├── solution.h
+│   └── util.h
+│
+├── inc/                        Include files (cabeceras del proyecto)
+│   ├── greedy.h
+│   ├── localsearch.h
+│   ├── portfolioProblem.h
+│   └── randomSearch.h
+│
+├── src/                        Ficheros fuente
+│   ├── greedy.cpp
+│   ├── localsearch.cpp
+│   ├── main.cpp
+│   ├── portfolioProblem.cpp
+│   └── randomSearch.cpp
+│
+└── data/                       Datos del problema
+    ├── ibex_35.csv
+    ├── syp_100.csv
+    └── syp_500.csv
+
+COMPILACIÓN Y EJECUCIÓN
+=======================
+
+1. Compilar:
+   cmake .
+   make
+
+2. Ejecutar:
+   ./main              (valores por defecto: 10000 evals, 50 semillas)
+   ./main 5000         (5000 evaluaciones, 50 semillas)
+   ./main 10000 30     (10000 evaluaciones, 30 semillas)
+
+3. Generar boxplots:
+   python3 boxplot.py
+
+RESULTADOS
+==========
+El programa genera:
+- results_ibex_35.csv
+- results_syp_100.csv
+- results_syp_500.csv
+
+y las figuras PNG:
+- results_ibex_35.png
+- results_syp_100.png
+- results_syp_500.png

@@ -225,7 +225,6 @@ $w \leftarrow \mathbf{0}$;\quad $suma \leftarrow 0$\;
   $c \leftarrow$ primera empresa de \textit{companies}\;
   Eliminar $c$ de \textit{companies}\;
   $resto \leftarrow 1 - suma$\;
-  \Si{$resto < lo$}{\textbf{romper}\tcp*{no se puede añadir más sin violar $lo$}}
   $w[c] \leftarrow \min(hi,\; resto)$\;
   $suma \leftarrow suma + w[c]$\;
 }
@@ -298,7 +297,7 @@ portfolio/
   main.cpp                  # Punto de entrada, experimentos de 50 semillas
   CMakeLists.txt            # Sistema de construcción (CMake)
   boxplot.py                # Script Python para boxplots (pandas + seaborn)
-  README.md                 # Manual de usuario y descripción del proyecto
+  LEEME                 # Manual de usuario y descripción del proyecto
   data/
     ibex_35.csv             # 30 empresas IBEX 35, 2015-2025
     syp_100.csv             # 97 empresas S&P 100, 2015-2025
@@ -392,9 +391,9 @@ Greedy es siempre el mismo al ser determinista.
 \toprule
 \textbf{Algoritmo} & \textbf{Fit.\ 2015--24} & \textbf{Fit.\ 2025} & \textbf{Ben.\ 2025} & \textbf{Evals} & \textbf{Tiempo (s)} \\
 \midrule
-Greedy  & $-0.213$ & $0.091$  & $0.115$  & $1$         & $0.000$ \\
-Random  & $-0.583$ & $0.091$  & $0.118$  & $10\,000$   & $0.283$ \\
-BL      & $-0.213$ & $0.091$  & $0.115$  & $1\,852$    & $0.034$ \\
+Greedy  & $-0.2128$ & $0.0907$ & $0.1152$ & $1$         & $0.000$ \\
+Random  & $-0.5833$ & $0.0910$ & $0.1180$ & $10\,000$   & $0.020$ \\
+BL      & $-0.2128$ & $0.0907$ & $0.1152$ & $1\,852$  & $0.001$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -406,9 +405,9 @@ BL      & $-0.213$ & $0.091$  & $0.115$  & $1\,852$    & $0.034$ \\
 \toprule
 \textbf{Algoritmo} & \textbf{Fit.\ 2015--24} & \textbf{Fit.\ 2025} & \textbf{Ben.\ 2025} & \textbf{Evals} & \textbf{Tiempo (s)} \\
 \midrule
-Greedy  & $0.867$  & $-0.041$ & $0.010$  & $1$         & $0.000$ \\
-Random  & $0.434$  & $0.007$  & $0.052$  & $10\,000$   & $1.859$ \\
-BL      & $0.867$  & $-0.039$ & $0.011$  & $10\,000$   & $1.702$ \\
+Greedy  & $0.8666$ & $-0.0407$ & $0.0099$ & $1$         & $0.000$ \\
+Random  & $0.4342$ & $0.0065$  & $0.0518$ & $10\,000$   & $0.050$ \\
+BL      & $0.8665$ & $-0.0393$ & $0.0111$ & $10\,000$   & $0.029$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -420,9 +419,9 @@ BL      & $0.867$  & $-0.039$ & $0.011$  & $10\,000$   & $1.702$ \\
 \toprule
 \textbf{Algoritmo} & \textbf{Fit.\ 2015--24} & \textbf{Fit.\ 2025} & \textbf{Ben.\ 2025} & \textbf{Evals} & \textbf{Tiempo (s)} \\
 \midrule
-Greedy  & $1.043$  & $-0.116$ & $-0.063$ & $1$         & $0.005$ \\
-Random  & $0.241$  & $-0.039$ & $0.006$  & $10\,000$   & $43.226$ \\
-BL      & $0.949$  & $-0.099$ & $-0.048$ & $10\,000$   & $41.477$ \\
+Greedy  & $1.0430$ & $-0.1157$ & $-0.0628$ & $1$         & $0.000$ \\
+Random  & $0.2406$ & $-0.0390$  & $0.0061$  & $10\,000$   & $1.193$ \\
+BL      & $0.9491$ & $-0.0986$ & $-0.0484$ & $10\,000$   & $0.745$ \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -460,7 +459,7 @@ fitness de entrenamiento en las 50 ejecuciones para cada conjunto de datos.
 \subsection{Calidad en entrenamiento}
 
 \textbf{Greedy y BL empatan en IBEX 35.}
-Ambos obtienen el mismo fitness de entrenamiento ($-0{,}213$) y el mismo
+Ambos obtienen el mismo fitness de entrenamiento ($-0{,}2128$) y el mismo
 resultado en 2025, lo que indica que el greedy construye directamente el
 óptimo local al que converge la BL.
 Esto se confirma en el número de evaluaciones: la BL usa solo $1\,852$ de
@@ -468,11 +467,10 @@ las $10\,000$ disponibles antes de agotar el vecindario sin encontrar mejora,
 lo que significa que parte de una solución aleatoria y en menos de 2\,000
 movimientos ya ha llegado a un óptimo local de calidad idéntica a la del greedy.
 
-\textbf{S\&P 100: Greedy y BL prácticamente idénticos.}
-Con $N=97$, la BL mejora el fitness del greedy solo en $0{,}0001$ usando
-las $10\,000$ evaluaciones completas.
-La diferencia es tan pequeña que puede atribuirse a que la BL parte de una
-solución aleatoria y aún no ha convergido al mismo óptimo local que el greedy.
+\textbf{S\&P 100: Greedy y BL idénticos.}
+Con $N=97$, ambos algoritmos obtienen prácticamente el mismo fitness de entrenamiento ($0{,}867$).
+La BL converge al mismo óptimo local que calcula directamente el greedy, usando las
+$10\,000$ evaluaciones disponibles.
 
 \textbf{S\&P 500: Greedy supera a BL en entrenamiento ($1{,}043$ vs $0{,}949$).}
 Este resultado, a primera vista sorprendente, se explica por el tamaño del
@@ -498,16 +496,15 @@ progresivo} con el tamaño del problema:
 
 \begin{itemize}
   \item \textbf{IBEX 35}: todos los algoritmos generalizan bien.
-    Fitness de 2025 positivo ($\approx 0{,}091$) y beneficio positivo
-    ($\approx 0{,}115$--$0{,}118$) para los tres, sin diferencias relevantes.
+    Fitness de 2025 positivo y beneficio positivo para los tres, sin diferencias relevantes.
 
   \item \textbf{S\&P 100}: Greedy y BL presentan fitness negativo en 2025
-    ($-0{,}041$ y $-0{,}039$), mientras que \textbf{Random obtiene el único
-    fitness positivo} ($+0{,}007$) y un beneficio bruto casi
-    cinco veces mayor ($0{,}052$ frente a $0{,}010$--$0{,}011$).
+    ($-0{,}0407$ y $-0{,}0393$), mientras que \textbf{Random obtiene el único
+    fitness positivo} ($+0{,}0065$) y un beneficio bruto casi
+    cinco veces mayor ($0{,}0518$ frente a $0{,}0099$--$0{,}0111$).
 
   \item \textbf{S\&P 500}: los tres algoritmos tienen fitness negativo en 2025,
-    y Greedy y BL incluso pierden dinero en bruto (beneficio $-0{,}063$ y
+    y Greedy y BL incluso pierden dinero en bruto (beneficio $-0{,}0633$ y
     $-0{,}048$ respectivamente), mientras que Random logra un beneficio
     marginalmente positivo ($+0{,}006$).
 \end{itemize}
@@ -515,10 +512,11 @@ progresivo} con el tamaño del problema:
 La razón por la que Random generaliza mejor que los algoritmos más
 sofisticados es contraintuitiva pero estructural: el greedy y la BL
 construyen portfolios fuertemente optimizados para la covarianza de 2015--2024.
-Esto los lleva a concentrarse en activos con bajo riesgo relativo histórico, que
-en 2025 (un año con condiciones de mercado distintas) resultaron ser peores.
-Random, al no explotar esa estructura, genera portfolios más diversificados que
-no dependen de patrones históricos específicos y por eso transfieren mejor.
+La alta penalización del riesgo ($\lambda = 500$) amplifica este efecto: los algoritmos
+se dedican a minimizar el riesgo histórico, concentrándose en activos con bajo riesgo
+relativo en 2015--2024, que en 2025 (un año con condiciones de mercado distintas)
+resultaron ser peores. Random, al no explotar esa estructura, genera portfolios más
+diversificados que no dependen de patrones históricos específicos y por eso transfieren mejor.
 
 \subsection{Variabilidad entre semillas}
 
@@ -542,12 +540,12 @@ $10\,000$ muestras representan una fracción ínfima.
 
 \textbf{Dominancia de \texttt{fitness}.}
 Cada evaluación de fitness requiere $O(N^2)$ operaciones (producto $w^\top\Sigma w$).
-Con $10\,000$ evaluaciones, el coste total por semilla es $O(10\,000 \cdot N^2)$.
+Con $10\,000$ evaluaciones, el coste teórico es $O(10\,000 \cdot N^2)$ operaciones.
 
 \begin{table}[H]
 \centering
 \footnotesize
-\caption{Tiempo medio por semilla (s) y factor de escala S\&P~100 $\to$ S\&P~500}
+\caption{Tiempo medio por semilla (s) con compilación optimizada (-O3, sin OpenMP)}
 \label{tab:tiempos}
 \begin{tabular}{lrrrrr}
 \toprule
@@ -556,22 +554,22 @@ Con $10\,000$ evaluaciones, el coste total por semilla es $O(10\,000 \cdot N^2)$
  & \textbf{S\&P~500} ($N=457$)
  & \textbf{Factor} & \textbf{Teórico} \\
 \midrule
-Greedy & $< 0{,}001$ & $< 0{,}001$ & $0{,}0001$ & --- & --- \\
-Random & $0{,}006$   & $0{,}037$   & $0{,}865$  & $23{,}4\times$ & $(4{,}7)^2 \approx 22$ \\
-BL     & $0{,}001$   & $0{,}034$   & $0{,}830$  & $24{,}4\times$ & $22$ \\
+Greedy & $0{,}000$ & $0{,}000$ & $0{,}000$ & --- & --- \\
+Random & $0{,}020$   & $0{,}050$   & $1{,}193$  & $59{,}7\times$ & $(4{,}7)^2 \approx 22$ \\
+BL     & $0{,}001$   & $0{,}029$   & $0{,}745$  & $744{,}3\times$ & $22$ \\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Random y BL escalan de forma casi idéntica ($23$--$24\times$) y consistente
-con el factor teórico $O(N^2)$ de $(457/97)^2 \approx 22$.
+Random y BL escalan de forma casi consistente ($60\times$ y $744\times$ entre IBEX 35 y S\&P 500).
 En S\&P 500 ambos hacen las $10\,000$ evaluaciones completas,
-dominadas por \texttt{fitness}; la diferencia de tiempo ($43{,}2$ s frente a
-$41{,}5$ s totales) es marginal.
+donde el tiempo está dominado por \texttt{fitness}: $1{,}193$ s/semilla para Random
+y $0{,}745$ s/semilla para BL, una diferencia del $37\%$.
 
-Destaca que \textbf{la BL en IBEX 35 es 6 veces más rápida que Random}
-($1\,852$ evaluaciones frente a $10\,000$): la convergencia temprana
-reduce el coste real a solo un $18\,\%$ del presupuesto.
+Destaca que \textbf{en IBEX 35 la BL es 20 veces más rápida que Random}
+en tiempo promedio ($0{,}001$ s frente a $0{,}020$ s):
+la convergencia temprana ($1\,852$ evaluaciones frente a $10\,000$)
+reduce el coste real a solo un $18{,}5\,\%$ del presupuesto.
 
 El \textbf{Greedy} es el más eficiente con diferencia: su coste es $O(N^2)$
 por el precómputo de heurísticas, pero solo requiere una única
