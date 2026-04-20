@@ -1,22 +1,24 @@
 #include "../inc/portfolioProblem.h"
-#include "solution.h"
+
 #include <fstream>
 #include <iostream>
 #include <numeric>
 #include <sstream>
+
+#include "solution.h"
 // --- CONSTRUCTOR ---
-PortfolioProblem::PortfolioProblem(const std::string &filename, double min_val,
+PortfolioProblem::PortfolioProblem(const std::string& filename, double min_val,
                                    double max_val) {
   this->lo = min_val;
   this->hi = max_val;
-  this->lambda = 500.0; // El guion exige lambda = 500
+  this->lambda = 500.0;  // El guion exige lambda = 500
 
   loadData(filename);
 
   precomputeMatrices();
 }
 
-void PortfolioProblem::loadData(const std::string &filename) {
+void PortfolioProblem::loadData(const std::string& filename) {
   std::ifstream file(filename);
 
   // Comprobamos si el archivo se ha abierto correctamente
@@ -46,7 +48,7 @@ void PortfolioProblem::loadData(const std::string &filename) {
     while (std::getline(ss, token, ',')) {
       try {
         daily_returns.push_back(std::stod(token));
-      } catch (const std::invalid_argument &e) {
+      } catch (const std::invalid_argument& e) {
         daily_returns.push_back(0.0);
       }
     }
@@ -103,8 +105,7 @@ void PortfolioProblem::precomputeMatrices() {
   benefit_factors_test.assign(N, 0.0);
   covariance_test.assign(N, std::vector<double>(N, 0.0));
 
-  if (T_test == 0)
-    return;
+  if (T_test == 0) return;
 
   for (int i = 0; i < N; ++i) {
     double sum_mu = 0.0, sum_log = 0.0;
@@ -136,7 +137,7 @@ tSolution<double> PortfolioProblem::createSolution() {
   // Para elegir a qué empresas invertimos de forma aleatoria,
   // creamos un vector con los índices [0, 1, 2, ..., N-1] y lo barajamos.
   std::vector<int> indices(N);
-  std::iota(indices.begin(), indices.end(), 0); // Lo llena de 0 a N-1
+  std::iota(indices.begin(), indices.end(), 0);  // Lo llena de 0 a N-1
   Random::shuffle(indices);
 
   // Para el resto de valores asignar un valor aleatorio entre lo y hi
@@ -162,8 +163,8 @@ tSolution<double> PortfolioProblem::createSolution() {
 }
 
 // 3.4 del guion
-void PortfolioProblem::fix(tSolution<double> &solution) {
-  const double epsilon = 1e-8; // Error
+void PortfolioProblem::fix(tSolution<double>& solution) {
+  const double epsilon = 1e-8;  // Error
 
   // Normalizar la solución inicial. No pasa nada
   // si normalizamos dos veces
@@ -190,10 +191,9 @@ void PortfolioProblem::fix(tSolution<double> &solution) {
 
   // Recalculamos la suma tras el primer recorte
   sum = 0.0;
-  for (int i = 0; i < N; ++i)
-    sum += solution[i];
+  for (int i = 0; i < N; ++i) sum += solution[i];
 
-  int max_iters = 1000; // para evitar bucles infinitos
+  int max_iters = 1000;  // para evitar bucles infinitos
   int iter = 0;
 
   // Mientras la suma no sea 1 (teniendo en cuenta el margen de error epsilon)
@@ -220,25 +220,23 @@ void PortfolioProblem::fix(tSolution<double> &solution) {
           solution[idx] += a_repartir;
           // Mantenemos el rango: si al sumarle se pasa del máximo, lo capamos a
           // 'hi'
-          if (solution[idx] > hi)
-            solution[idx] = hi;
+          if (solution[idx] > hi) solution[idx] = hi;
         }
       } else {
         // Si no hay candidatos suficientes, incrementamos pesos iguales a 0 de
         // forma aleatoria
         std::vector<int> empresas_a_cero;
         for (int i = 0; i < N; ++i) {
-          if (solution[i] == 0.0)
-            empresas_a_cero.push_back(i);
+          if (solution[i] == 0.0) empresas_a_cero.push_back(i);
         }
 
         if (!empresas_a_cero.empty()) {
           // Barajamos y cogemos una al azar para darle el empujón inicial
           Random::shuffle(empresas_a_cero);
           solution[empresas_a_cero[0]] =
-              lo; // La encendemos poniéndola al mínimo 'lo'
+              lo;  // La encendemos poniéndola al mínimo 'lo'
         } else {
-          break; // No se puede arreglar más (estamos al límite matemático)
+          break;  // No se puede arreglar más (estamos al límite matemático)
         }
       }
 
@@ -261,22 +259,20 @@ void PortfolioProblem::fix(tSolution<double> &solution) {
           solution[idx] -= a_quitar;
           // Mantenemos el rango: si al restarle baja del mínimo, lo capamos a
           // 'lo'
-          if (solution[idx] < lo)
-            solution[idx] = lo;
+          if (solution[idx] < lo) solution[idx] = lo;
         }
       } else {
-        break; // No se puede quitar más sin saltarse los límites
+        break;  // No se puede quitar más sin saltarse los límites
       }
     }
 
     // Recalculamos la suma para la siguiente comprobación del bucle while
     sum = 0.0;
-    for (int i = 0; i < N; ++i)
-      sum += solution[i];
+    for (int i = 0; i < N; ++i) sum += solution[i];
   }
 }
 
-bool PortfolioProblem::isValid(const tSolution<double> &solution) {
+bool PortfolioProblem::isValid(const tSolution<double>& solution) {
   const double epsilon = 1e-8;
   double sum = 0.0;
 
@@ -293,7 +289,7 @@ bool PortfolioProblem::isValid(const tSolution<double> &solution) {
   }
 
   if (std::abs(1.0 - sum) > epsilon) {
-    return false; // Falla por la suma
+    return false;  // Falla por la suma
   }
 
   return true;
@@ -305,27 +301,26 @@ std::pair<double, double> PortfolioProblem::getSolutionDomainRange() {
   return {lo, hi};
 }
 
-tFitness PortfolioProblem::fitness(const tSolution<double> &solution) {
+tFitness PortfolioProblem::fitness(const tSolution<double>& solution) {
   double beneficio = 0.0, riesgo = 0.0;
-  for (int i = 0; i < N; ++i)
-    beneficio += solution[i] * benefit_factors[i];
+  for (int i = 0; i < N; ++i) beneficio += solution[i] * benefit_factors[i];
   for (int i = 0; i < N; ++i)
     for (int j = 0; j < N; ++j)
       riesgo += solution[i] * covariance[i][j] * solution[j];
-  return beneficio - (lambda * riesgo);
+  return beneficio - (lambda * sqrt(riesgo));
 }
 
-double PortfolioProblem::beneficioTest(const tSolution<double> &solution) {
+double PortfolioProblem::beneficioTest(const tSolution<double>& solution) {
   double beneficio = 0.0;
   for (int i = 0; i < N; ++i)
     beneficio += solution[i] * benefit_factors_test[i];
   return beneficio;
 }
 
-tFitness PortfolioProblem::fitnessTest(const tSolution<double> &solution) {
+tFitness PortfolioProblem::fitnessTest(const tSolution<double>& solution) {
   double riesgo = 0.0;
   for (int i = 0; i < N; ++i)
     for (int j = 0; j < N; ++j)
       riesgo += solution[i] * covariance_test[i][j] * solution[j];
-  return beneficioTest(solution) - (lambda * riesgo);
+  return beneficioTest(solution) - (lambda * sqrt(riesgo));
 }

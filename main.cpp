@@ -1,5 +1,6 @@
 #include <chrono>
 #include <fstream>
+#include <genetic.h>
 #include <greedy.h>
 #include <iomanip>
 #include <iostream>
@@ -130,23 +131,47 @@ int main(int argc, char* argv[]) {
     RandomSearch<double>    ralg;
     Greedy<double>          greedy;
     LocalSearch<double>     ls;
+    AlgoritmoGenetico<double> agg_arit(TipoEsquema::GENERACIONAL,  TipoCruce::ARITMETICO);
+    AlgoritmoGenetico<double> agg_blx (TipoEsquema::GENERACIONAL,  TipoCruce::BLX);
+    AlgoritmoGenetico<double> age_arit(TipoEsquema::ESTACIONARIO,  TipoCruce::ARITMETICO);
+    AlgoritmoGenetico<double> age_blx (TipoEsquema::ESTACIONARIO,  TipoCruce::BLX);
 
-    cout << "Ejecutando Random...";   cout.flush();
-    auto res_rand   = runAlgorithm(ralg,   problem, seeds);
+    cout << "Ejecutando Random...";    cout.flush();
+    auto res_rand    = runAlgorithm(ralg,     problem, seeds);
     cout << " OK\n";
 
-    cout << "Ejecutando Greedy...";   cout.flush();
-    auto res_greedy = runAlgorithm(greedy, problem, seeds);
+    cout << "Ejecutando Greedy...";    cout.flush();
+    auto res_greedy  = runAlgorithm(greedy,   problem, seeds);
     cout << " OK\n";
 
-    cout << "Ejecutando BL...";       cout.flush();
-    auto res_ls     = runAlgorithm(ls,     problem, seeds);
+    cout << "Ejecutando BL...";        cout.flush();
+    auto res_ls      = runAlgorithm(ls,       problem, seeds);
+    cout << " OK\n";
+
+    cout << "Ejecutando AGG-Arit...";  cout.flush();
+    auto res_agg_arit = runAlgorithm(agg_arit, problem, seeds);
+    cout << " OK\n";
+
+    cout << "Ejecutando AGG-BLX...";   cout.flush();
+    auto res_agg_blx  = runAlgorithm(agg_blx,  problem, seeds);
+    cout << " OK\n";
+
+    cout << "Ejecutando AGE-Arit...";  cout.flush();
+    auto res_age_arit = runAlgorithm(age_arit, problem, seeds);
+    cout << " OK\n";
+
+    cout << "Ejecutando AGE-BLX...";   cout.flush();
+    auto res_age_blx  = runAlgorithm(age_blx,  problem, seeds);
     cout << " OK\n";
 
     vector<pair<string, vector<RunResult>>> alg_results = {
-        {"greedy", res_greedy},
-        {"random", res_rand},
-        {"bl",     res_ls},
+        {"greedy",   res_greedy},
+        {"random",   res_rand},
+        {"bl",       res_ls},
+        {"AGG-Arit", res_agg_arit},
+        {"AGG-BLX",  res_agg_blx},
+        {"AGE-Arit", res_age_arit},
+        {"AGE-BLX",  res_age_blx},
     };
 
     printTable(ds.name, alg_results);

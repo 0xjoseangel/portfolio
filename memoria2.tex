@@ -1,0 +1,499 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[spanish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+\usepackage[hidelinks]{hyperref}
+\usepackage{float}
+\usepackage{graphicx}
+\newcommand{\maybeimage}[3]{%
+  \IfFileExists{#1}{\includegraphics[#2]{#1}}%
+  {\fbox{\parbox{0.7\textwidth}{\centering\vspace{1cm}[Figura pendiente: #3]\vspace{1cm}}}}%
+}
+\usepackage{caption}
+\usepackage{parskip}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{xcolor}
+\usepackage{array}
+
+\geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
+\setlength{\parskip}{6pt}
+
+\titlespacing*{\section}{0pt}{14pt}{6pt}
+\titlespacing*{\subsection}{0pt}{10pt}{4pt}
+
+\newcommand{\placeholder}[0]{\textit{---}}
+
+\SetKwInput{KwIn}{Entrada}
+\SetKwInput{KwOut}{Salida}
+\SetKw{KwReturn}{devolver}
+\SetKwFor{Para}{para}{hacer}{fin para}
+\SetKwFor{Mientras}{mientras}{hacer}{fin mientras}
+\SetKwIF{Si}{SiNo}{OSiNo}{si}{entonces}{si no si}{si no}{fin si}
+\SetKwFunction{fitness}{fitness}
+\SetKwFunction{fix}{fix}
+\SetKwFunction{createSolution}{crearSolución}
+\SetKwFunction{torneo}{torneo}
+\SetKwFunction{cruzar}{cruzar}
+\SetKwFunction{mutar}{mutar}
+\SetKwFunction{BL}{BL}
+
+%-----------------------------------------------------------------------
+\begin{document}
+
+%-----------------------------------------------------------------------
+% PORTADA
+%-----------------------------------------------------------------------
+\begin{titlepage}
+  \centering
+  \vspace*{2cm}
+  {\Large \textbf{Universidad de Granada}\\[0.3cm]
+          \textbf{ETSIIT Informática y Telecomunicación}\\[0.3cm]
+          Dpto.\ de Ciencias de la Computación e Inteligencia Artificial}
+
+  \vspace{2.5cm}
+  {\LARGE \textbf{Metaheurísticas}}\\[0.5cm]
+  {\Large Práctica 2}\\[0.3cm]
+  {\large Técnicas de Búsqueda basadas en Poblaciones\\
+           para el Problema de Portfolio}
+
+  \vspace{1.5cm}
+  {\large Curso 2025--2026}
+
+  \vfill
+  \begin{tabular}{rl}
+    \textbf{Nombre:}  & Jose Angel Carretero Montes \\[4pt]
+    \textbf{DNI:}     & 25628892S \\[4pt]
+    \textbf{Email:}   & \texttt{joseangel1@correo.ugr.es} \\[4pt]
+    \textbf{Grupo:}   & Grupo 3 \\[4pt]
+    \textbf{Horario:} & Martes 15:30--17:30 \\
+  \end{tabular}
+  \vspace{1.5cm}
+\end{titlepage}
+
+%-----------------------------------------------------------------------
+% ÍNDICE
+%-----------------------------------------------------------------------
+\tableofcontents
+\newpage
+
+%-----------------------------------------------------------------------
+\section{Descripción del Problema}
+%-----------------------------------------------------------------------
+
+El \textbf{Problema de Portfolio} consiste en determinar la asignación óptima de capital
+entre $N$ activos financieros con el objetivo de maximizar el retorno esperado
+minimizando simultáneamente el riesgo.
+
+\subsection*{Representación de los datos}
+
+Para cada activo $i \in \{1,\ldots,N\}$ y día $t \in \{1,\ldots,T\}$ se dispone
+del retorno diario $\mu_{ti}$, calculado como el ratio de mejora relativa del valor:
+\[
+  \mu_{ti} = \frac{V_{ti} - V_{(t+1)i}}{V_{ti}}
+\]
+Los datos empleados cubren el periodo 2015--2024 para entrenamiento y el año 2025
+para evaluación de generalización.
+
+\subsection*{Función objetivo}
+
+Dado un vector de pesos $w = (w_1,\ldots,w_N)$, la calidad de la cartera se mide como:
+\[
+  \text{fitness}(w) = \text{Beneficio}(w) - \lambda \cdot \text{Riesgo}(w)
+\]
+donde:
+\[
+  \text{Beneficio}(w) = \sum_{i=1}^{N} w_i \cdot \sum_{t=1}^{T}\log(1+\mu_{ti})
+  \qquad
+  \text{Riesgo}(w) = \sqrt{\sum_{i=1}^{N}\sum_{j=1}^{N} w_i \cdot \Sigma_{ij} \cdot w_j}
+\]
+siendo $\Sigma_{ij}$ la covarianza entre activos $i$ y $j$, y $\lambda$ el factor de
+penalización del riesgo definido en las transparencias del Seminario 2.
+
+\subsection*{Restricciones}
+
+\[
+  \sum_{i=1}^{N} w_i = 1 \qquad
+  w_i = 0 \;\vee\; lo \le w_i \le hi \quad \forall i \in 1\ldots N
+\]
+
+Los rangos $[lo, hi]$ varían según el conjunto de datos (véase Sección~\ref{sec:experimentos}).
+
+%-----------------------------------------------------------------------
+\section{Aplicación de los Algoritmos al Problema}
+%-----------------------------------------------------------------------
+
+\subsection{Representación de soluciones}
+
+Una solución queda representada como un vector $w \in \mathbb{R}^N$
+donde cada componente $w_i$ indica la fracción del capital invertida en el activo $i$.
+La restricción de cardinalidad implica que $w_i$ puede ser exactamente cero
+(no se invierte en esa empresa) o estar en el intervalo $[lo, hi]$.
+
+\subsection{Generación aleatoria de soluciones}
+
+La generación de la solución inicial es la misma que en la Práctica 1: se elige un
+subconjunto aleatorio de empresas activas, se les asigna un peso aleatorio en $[lo, hi]$,
+se normaliza y se aplica el operador de reparación.
+
+\subsection{Operador de reparación (\texttt{fix})}
+
+El operador de reparación es el mismo que el empleado en la Práctica 1 (tres fases:
+normalización, recorte de rango, redistribución iterativa).
+Es especialmente importante en los algoritmos genéticos ya que los operadores de
+cruce pueden generar soluciones que violen las restricciones.
+
+\subsection{Operador de selección: torneo binario}
+
+En ambos esquemas (generacional y estacionario) se usa el \textbf{torneo binario}:
+se eligen dos individuos al azar de la población y se devuelve el de mayor fitness.
+
+\begin{algorithm}[H]
+\caption{Torneo binario}
+\KwIn{población $P$}
+\KwOut{individuo ganador}
+$i_1 \leftarrow$ índice aleatorio en $[0, |P|-1]$\;
+$i_2 \leftarrow$ índice aleatorio en $[0, |P|-1]$\;
+\Si{$P[i_1].\text{fitness} \geq P[i_2].\text{fitness}$}{
+  \KwReturn{$P[i_1]$}
+}
+\KwReturn{$P[i_2]$}
+\end{algorithm}
+
+\subsection{Operadores de cruce}
+
+Se emplean dos operadores para representación real, según la Ecuación~(4) y~(5) del guión.
+
+\subsubsection*{Cruce Aritmético}
+
+Para cada posición $i$ se genera un $r_i \in [0,1]$ independiente:
+\[
+  Off^1_i = r_i \cdot S^1_i + (1-r_i) \cdot S^2_i
+  \qquad
+  Off^2_i = r_i \cdot S^2_i + (1-r_i) \cdot S^1_i
+\]
+
+\subsubsection*{Cruce BLX-$\alpha$}
+
+Para cada posición $i$, siendo $I_i = |S^1_i - S^2_i|$:
+\[
+  hmin_i = \min(S^1_i, S^2_i) - \alpha \cdot I_i
+  \qquad
+  hmax_i = \max(S^1_i, S^2_i) + \alpha \cdot I_i
+\]
+Cada gen del hijo se genera uniformemente en $[hmin_i, hmax_i]$, con $\alpha = 0{,}3$.
+
+Tras ambos cruces se aplica \fix{} a los hijos generados.
+
+\subsection{Operador de mutación}
+
+Con probabilidad $p_m = 0{,}1$ por individuo, se selecciona un gen aleatorio y se
+reemplaza por un valor uniforme en $[lo, hi]$, seguido de \fix{}. Solo cuenta como
+evaluación si efectivamente se muta.
+
+%-----------------------------------------------------------------------
+\section{Algoritmos Genéticos}
+%-----------------------------------------------------------------------
+
+\subsection{Algoritmo Genético Generacional (AGG)}
+
+El AGG mantiene una población completa de $N_p = 100$ individuos que se reemplaza
+generación a generación. Incorpora elitismo para no perder la mejor solución encontrada.
+
+\subsubsection*{Parámetros}
+\begin{itemize}
+  \item Tamaño de población: $N_p = 100$
+  \item Probabilidad de cruce: $p_c = 0{,}8$
+  \item Probabilidad de mutación: $p_m = 0{,}1$ (por individuo)
+  \item Criterio de parada: $10\,000$ evaluaciones de la función objetivo
+\end{itemize}
+
+\subsubsection*{Esquema de evolución y reemplazamiento}
+
+\begin{algorithm}[H]
+\caption{AGG (esquema generacional con elitismo)}
+\KwIn{problema, maxEvals}
+\KwOut{mejor solución encontrada}
+Inicializar población $P$ con $N_p$ individuos aleatorios\;
+\Mientras{$evals < maxEvals$}{
+  $P' \leftarrow \emptyset$\;
+  \Para{$i \leftarrow 1$ \KwTo $N_p/2$ \textbf{y} $evals < maxEvals$}{
+    $p_1 \leftarrow$ \torneo{$P$};\quad $p_2 \leftarrow$ \torneo{$P$}\;
+    \Si{$\text{rand}() \leq p_c$}{
+      $(h_1, h_2) \leftarrow$ \cruzar{$p_1, p_2$}\;
+    }\SiNo{
+      $h_1 \leftarrow p_1$;\quad $h_2 \leftarrow p_2$\;
+    }
+    \mutar{$h_1$};\quad \mutar{$h_2$}\;
+    $P' \leftarrow P' \cup \{h_1, h_2\}$\;
+  }
+  \tcp{Elitismo: conservar el mejor padre si la nueva generación es peor}
+  \Si{$\text{mejor}(P').\text{fitness} < \text{mejor}(P).\text{fitness}$}{
+    $\text{peor}(P') \leftarrow \text{mejor}(P)$\;
+  }
+  $P \leftarrow P'$\;
+}
+\KwReturn{$\text{mejor}(P)$}
+\end{algorithm}
+
+\noindent Se implementan dos variantes: \textbf{AGG-Arit} (cruce aritmético) y
+\textbf{AGG-BLX} (cruce BLX-$\alpha$), siendo esa la única diferencia entre ellas.
+
+\subsection{Algoritmo Genético Estacionario (AGE)}
+
+El AGE genera solo dos descendientes por iteración y los inserta en la población
+reemplazando a los dos peores si son mejores que ellos. La población apenas varía
+en cada paso, lo que lo hace más conservador.
+
+\subsubsection*{Parámetros}
+\begin{itemize}
+  \item Tamaño de población: $N_p = 100$
+  \item Probabilidad de cruce: $p_c = 1{,}0$ (siempre se cruzan los dos padres)
+  \item Probabilidad de mutación: $p_m = 0{,}1$ (por individuo)
+  \item Criterio de parada: $10\,000$ evaluaciones de la función objetivo
+\end{itemize}
+
+\subsubsection*{Esquema de evolución y reemplazamiento}
+
+\begin{algorithm}[H]
+\caption{AGE (esquema estacionario)}
+\KwIn{problema, maxEvals}
+\KwOut{mejor solución encontrada}
+Inicializar población $P$ con $N_p$ individuos aleatorios\;
+\Mientras{$evals < maxEvals$}{
+  $p_1 \leftarrow$ \torneo{$P$};\quad $p_2 \leftarrow$ \torneo{$P$}\;
+  $(h_1, h_2) \leftarrow$ \cruzar{$p_1, p_2$}\;
+  \mutar{$h_1$};\quad \mutar{$h_2$}\;
+  \tcp{Reemplazamiento competitivo: cada hijo desafía al peor de la población}
+  \Si{$h_1.\text{fitness} > \text{peor}(P).\text{fitness}$}{
+    $\text{peor}(P) \leftarrow h_1$\;
+  }
+  \Si{$h_2.\text{fitness} > \text{peor}(P).\text{fitness}$}{
+    $\text{peor}(P) \leftarrow h_2$\;
+  }
+}
+\KwReturn{$\text{mejor}(P)$}
+\end{algorithm}
+
+\noindent Se implementan dos variantes: \textbf{AGE-Arit} y \textbf{AGE-BLX}.
+
+%-----------------------------------------------------------------------
+\section{Estructura del Código y Manual de Usuario}
+%-----------------------------------------------------------------------
+
+\subsection{Estructura de directorios}
+
+\begin{verbatim}
+portfolio/
+  main.cpp                  # Punto de entrada, experimentos de 50 semillas
+  CMakeLists.txt            # Sistema de construcción (CMake)
+  boxplot.py                # Script Python para boxplots (pandas + seaborn)
+  LEEME                     # Manual de usuario
+  data/
+    ibex_35.csv             # 30 empresas IBEX 35, 2015-2025
+    syp_100.csv             # 97 empresas S&P 100, 2015-2025
+    syp_500.csv             # 457 empresas S&P 500, 2015-2025
+  common/
+    mh.h                    # Interfaz genérica MH<tDomain>
+    problem.h               # Interfaz genérica Problem<tDomain>
+    random.hpp              # Generador pseudoaleatorio
+    util.h                  # Utilidades auxiliares
+  inc/
+    portfolioProblem.h      # Declaración del problema de portfolio
+    randomSearch.h          # Algoritmo aleatorio
+    greedy.h                # Algoritmo greedy
+    localsearch.h           # Búsqueda local (primero mejor)
+    genetic.h               # Algoritmos genéticos (AGG y AGE)
+  src/
+    portfolioProblem.cpp    # Carga de datos, precómputo, fitness, fix
+    randomSearch.cpp        # Implementación búsqueda aleatoria
+    greedy.cpp              # Implementación greedy
+    localsearch.cpp         # Implementación búsqueda local
+    genetic.cpp             # Implementación AGG y AGE
+\end{verbatim}
+
+\subsection{Compilación}
+
+Desde el directorio raíz del proyecto:
+
+\begin{verbatim}
+cmake .
+make
+\end{verbatim}
+
+\subsection{Ejecución}
+
+\begin{verbatim}
+./main [max_evals] [n_seeds]
+\end{verbatim}
+
+\noindent Ejemplos:
+\begin{verbatim}
+./main                  # valores por defecto: 10000 evaluaciones, 50 semillas
+./main 5000             # 5000 evaluaciones, 50 semillas
+./main 10000 30         # 10000 evaluaciones, 30 semillas
+\end{verbatim}
+
+Imprime tablas de medias por pantalla y genera los ficheros CSV
+\texttt{results\_ibex\_35.csv}, \texttt{results\_syp\_100.csv},
+\texttt{results\_syp\_500.csv}.
+
+Las semillas utilizadas son $1, 2, \ldots, \texttt{n\_seeds}$,
+iguales para todos los algoritmos.
+
+%-----------------------------------------------------------------------
+\section{Experimentos y Resultados}
+\label{sec:experimentos}
+%-----------------------------------------------------------------------
+
+\subsection{Casos del problema}
+
+\begin{center}
+\begin{tabular}{lrrrl}
+\toprule
+\textbf{Fichero} & \textbf{Empresas ($N$)} & \textbf{Días train ($T$)} & \textbf{Días test} & \textbf{Rango $[lo, hi]$} \\
+\midrule
+\texttt{ibex\_35.csv}  & 30  & $\sim$2560 & 254 & $[0.005,\; 0.08]$ \\
+\texttt{syp\_100.csv}  & 97  & $\sim$2516 & 249 & $[0.005,\; 0.05]$ \\
+\texttt{syp\_500.csv}  & 457 & $\sim$2516 & 249 & $[0.005,\; 0.02]$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Parámetros comunes: $\lambda = 500$, \texttt{MAX\_EVALS} $= 10\,000$,
+50 semillas ($1$--$50$).
+
+\subsection{Resultados}
+
+\begin{table}[H]
+\centering
+\caption{Resultados IBEX 35 --- $N=30$, $[lo,hi]=[0.005, 0.08]$ (medias, 50 semillas)}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Algoritmo} & \textbf{Fit.\ 2015--24} & \textbf{Fit.\ 2025} & \textbf{Ben.\ 2025} & \textbf{Evals} & \textbf{Tiempo (s)} \\
+\midrule
+Greedy   & \placeholder & \placeholder & \placeholder & $1$           & \placeholder \\
+Random   & \placeholder & \placeholder & \placeholder & $10\,000$     & \placeholder \\
+BL       & \placeholder & \placeholder & \placeholder & \placeholder  & \placeholder \\
+AGG-Arit & \placeholder & \placeholder & \placeholder & $10\,000$     & \placeholder \\
+AGG-BLX  & \placeholder & \placeholder & \placeholder & $10\,000$     & \placeholder \\
+AGE-Arit & \placeholder & \placeholder & \placeholder & $10\,000$     & \placeholder \\
+AGE-BLX  & \placeholder & \placeholder & \placeholder & $10\,000$     & \placeholder \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Resultados S\&P 100 --- $N=97$, $[lo,hi]=[0.005, 0.05]$ (medias, 50 semillas)}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Algoritmo} & \textbf{Fit.\ 2015--24} & \textbf{Fit.\ 2025} & \textbf{Ben.\ 2025} & \textbf{Evals} & \textbf{Tiempo (s)} \\
+\midrule
+Greedy   & \placeholder & \placeholder & \placeholder & $1$           & \placeholder \\
+Random   & \placeholder & \placeholder & \placeholder & $10\,000$     & \placeholder \\
+BL       & \placeholder & \placeholder & \placeholder & \placeholder  & \placeholder \\
+AGG-Arit & \placeholder & \placeholder & \placeholder & $10\,000$     & \placeholder \\
+AGG-BLX  & \placeholder & \placeholder & \placeholder & $10\,000$     & \placeholder \\
+AGE-Arit & \placeholder & \placeholder & \placeholder & $10\,000$     & \placeholder \\
+AGE-BLX  & \placeholder & \placeholder & \placeholder & $10\,000$     & \placeholder \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering
+\caption{Resultados S\&P 500 --- $N=457$, $[lo,hi]=[0.005, 0.02]$ (medias, 50 semillas)}
+\begin{tabular}{lrrrrr}
+\toprule
+\textbf{Algoritmo} & \textbf{Fit.\ 2015--24} & \textbf{Fit.\ 2025} & \textbf{Ben.\ 2025} & \textbf{Evals} & \textbf{Tiempo (s)} \\
+\midrule
+Greedy   & \placeholder & \placeholder & \placeholder & $1$           & \placeholder \\
+Random   & \placeholder & \placeholder & \placeholder & $10\,000$     & \placeholder \\
+BL       & \placeholder & \placeholder & \placeholder & \placeholder  & \placeholder \\
+AGG-Arit & \placeholder & \placeholder & \placeholder & $10\,000$     & \placeholder \\
+AGG-BLX  & \placeholder & \placeholder & \placeholder & $10\,000$     & \placeholder \\
+AGE-Arit & \placeholder & \placeholder & \placeholder & $10\,000$     & \placeholder \\
+AGE-BLX  & \placeholder & \placeholder & \placeholder & $10\,000$     & \placeholder \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Boxplots}
+
+Las Figuras~\ref{fig:box_ibex}--\ref{fig:box_syp500} muestran la distribución del
+fitness de entrenamiento en las 50 ejecuciones para cada conjunto de datos.
+
+\begin{figure}[H]
+  \centering
+  \maybeimage{results_ibex_35.png}{width=0.85\textwidth}{results\_ibex\_35.png}
+  \caption{Distribución del fitness (2015--2024) en IBEX 35.}
+  \label{fig:box_ibex}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \maybeimage{results_syp_100.png}{width=0.85\textwidth}{results\_syp\_100.png}
+  \caption{Distribución del fitness (2015--2024) en S\&P 100.}
+  \label{fig:box_syp100}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \maybeimage{results_syp_500.png}{width=0.85\textwidth}{results\_syp\_500.png}
+  \caption{Distribución del fitness (2015--2024) en S\&P 500.}
+  \label{fig:box_syp500}
+\end{figure}
+
+%-----------------------------------------------------------------------
+\section{Análisis de Resultados}
+%-----------------------------------------------------------------------
+
+% INSTRUCCIONES: rellena este apartado tras obtener los resultados experimentales.
+% El guión exige comparar algoritmos con mayor similitud para aislar el elemento
+% que los diferencia. Estructura sugerida:
+
+\subsection{AGG-Arit vs AGG-BLX}
+
+% Comparar el efecto del operador de cruce dentro del esquema generacional.
+% ¿Cuál explora mejor? ¿Converge más rápido alguno de los dos?
+
+\placeholder
+
+\subsection{AGE-Arit vs AGE-BLX}
+
+% Ídem para el esquema estacionario.
+
+\placeholder
+
+\subsection{AGG vs AGE (comparación de esquemas)}
+
+% Fijar el cruce (Arit o BLX) y comparar generacional vs estacionario.
+% El AGE es más elitista: ¿converge antes? ¿pierde diversidad?
+
+\placeholder
+
+\subsection{AGGs/AGEs vs BL y Greedy}
+
+% ¿Mejoran los genéticos a la BL? ¿A qué coste en tiempo?
+% ¿Generalizan mejor o siguen sobreajustando?
+
+\placeholder
+
+\subsection{Variabilidad y coste computacional}
+
+% Boxplots: ¿qué algoritmos tienen menor varianza? ¿mayor?
+% Tiempos: los genéticos hacen 10000 evals como Random pero son más lentos por
+% la gestión de la población — comentar el factor.
+
+\placeholder
+
+%-----------------------------------------------------------------------
+
+\end{document}

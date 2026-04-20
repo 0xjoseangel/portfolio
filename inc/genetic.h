@@ -15,6 +15,7 @@ struct Individuo {
 
   // Un operador para ordenar de mejor a peor (útil para el Elitismo y AGE)
   bool operator>(const Individuo& otro) const { return fitness > otro.fitness; }
+  bool operator<(const Individuo& otro) const { return fitness < otro.fitness; }
 };
 
 template <typename tDomain>
@@ -27,13 +28,16 @@ class AlgoritmoGenetico : public MH<tDomain> {
   double pMutacion;
 
   Individuo torneo(const std::vector<Individuo>& poblacion, int k = 2);
-  void mutar(Individuo& ind, Problem<tDomain>& problem);
+  void mutar(Individuo& ind, Problem<tDomain>& problem, int& evaluaciones);
   std::pair<Individuo, Individuo> cruzar(const Individuo& p1,
                                          const Individuo& p2,
-                                         Problem<tDomain>& problem);
+                                         Problem<tDomain>& problem,
+                                         int& evaluaciones);
 
  public:
   AlgoritmoGenetico(TipoEsquema e, TipoCruce c);
+  ~AlgoritmoGenetico() override = default;
+
   ResultMH<tDomain> optimize(Problem<tDomain>& problem, int maxevals) override;
 };
 
