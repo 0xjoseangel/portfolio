@@ -8,6 +8,7 @@
 
 enum class TipoEsquema { GENERACIONAL, ESTACIONARIO };
 enum class TipoCruce { ARITMETICO, BLX };
+enum class TipoMemetico { ALL, RAND, BEST, GENETICO };
 
 struct Individuo {
   tSolution<double> cromosomas;
@@ -23,6 +24,7 @@ class AlgoritmoGenetico : public MH<tDomain> {
  private:
   TipoEsquema esquema;
   TipoCruce cruce;
+  TipoMemetico tipo_memetico;
   int tamPoblacion = 100;
   double pCruce;
   double pMutacion;
@@ -35,7 +37,8 @@ class AlgoritmoGenetico : public MH<tDomain> {
                                          int& evaluaciones);
 
  public:
-  AlgoritmoGenetico(TipoEsquema e, TipoCruce c);
+  AlgoritmoGenetico(TipoEsquema e, TipoCruce c,
+                    TipoMemetico m = TipoMemetico::GENETICO);
   ~AlgoritmoGenetico() override = default;
 
   ResultMH<tDomain> optimize(Problem<tDomain>& problem, int maxevals) override;

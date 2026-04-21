@@ -1,19 +1,27 @@
 #include "genetic.h"
 
-// Implementación del constructor template
+#include "localsearch.h"
+
 template <typename tDomain>
-AlgoritmoGenetico<tDomain>::AlgoritmoGenetico(TipoEsquema e, TipoCruce c) {
+AlgoritmoGenetico<tDomain>::AlgoritmoGenetico(TipoEsquema e, TipoCruce c,
+                                              TipoMemetico m) {
   this->esquema = e;
   this->cruce = c;
+  this->tipo_memetico = m;
 
-  if (this->esquema == TipoEsquema::ESTACIONARIO) {
-    this->pCruce = 1.0;
+  if (this->tipo_memetico == TipoMemetico::GENETICO) {
+    if (this->esquema == TipoEsquema::ESTACIONARIO) {
+      this->pCruce = 1.0;
+    } else {
+      this->pCruce = 0.8;
+    }
+    this->pMutacion = 0.1;  // por individuo
   } else {
     this->pCruce = 0.8;
-  }
+    this->pMutacion = 0.1;
 
-  this->pMutacion = 0.1;
-  this->tamPoblacion = 100;
+    this->tamPoblacion = 100;
+  }
 }
 
 // Metodos auxiliares (torneo, mutar, cruzar)
@@ -44,21 +52,31 @@ template <typename tDomain>
 void AlgoritmoGenetico<tDomain>::mutar(Individuo& ind,
                                        Problem<tDomain>& problem,
                                        int& evaluaciones) {
-  if (Random::get(0.0, 1.0) <= this->pMutacion) {
-    auto [lo, hi] = problem.getSolutionDomainRange();
+  auto [lo, hi] = problem.getSolutionDomainRange();
+  int N = (int)ind.cromosomas.size();
+  bool mutado = false;
 
-    int gen_mutado = Random::get(0, (int)ind.cromosomas.size() - 1);
-    double valor_gen = Random::get(lo, hi);
+  if (this->tipo_memetico == TipoMemetico::GENETICO) {
+    // AGs: mutación de un gen con probabilidad 0.1 por individuo
+    if (Random::get(0.0, 1.0) <= this->pMutacion) {
+      int gen_mutado = Random::get(0, N - 1);
+      ind.cromosomas[gen_mutado] = Random::get(lo, hi);
+      mutado = true;
+    }
+  } else {
+    // AMs: mutación por gen con probabilidad 0.1/N
+    double pMut_gene = 0.1 / N;
+    for (int i = 0; i < N; ++i) {
+      if (Random::get(0.0, 1.0) <= pMut_gene) {
+        ind.cromosomas[i] = Random::get(lo, hi);
+        mutado = true;
+      }
+    }
+  }
 
-    // Mutamos
-    ind.cromosomas[gen_mutado] = valor_gen;
-
-    // Arreglamos la solucion
+  if (mutado) {
     problem.fix(ind.cromosomas);
-
-    // Recalculamos el fitnes
     ind.fitness = problem.fitness(ind.cromosomas);
-
     evaluaciones++;
   }
 }
@@ -114,11 +132,10 @@ template <typename tDomain>
 ResultMH<tDomain> AlgoritmoGenetico<tDomain>::optimize(
     Problem<tDomain>& problem, int maxevals) {
   int evaluaciones = 0;
+  int generaciones = 0;
   std::vector<Individuo> poblacion;
 
-  // --- 1. EL GÉNESIS: Crear la población inicial ---
-  // Escribe aquí tu bucle for para rellenar el vector 'poblacion'
-  // Recuerda sumar 1 a 'evaluaciones' por cada individuo
+  // Crear la población inicial ---
   for (int i = 0; i < this->tamPoblacion; i++) {
     auto adn = problem.createSolution();
     double fitness = problem.fitness(adn);
@@ -127,7 +144,7 @@ ResultMH<tDomain> AlgoritmoGenetico<tDomain>::optimize(
 
     evaluaciones++;
   }
-  // --- 2. EL BUCLE PRINCIPAL DE EVOLUCIÓN ---
+  // BUCLE PRINCIPAL DE EVOLUCIÓN ---
   while (evaluaciones < maxevals) {
     if (this->esquema == TipoEsquema::GENERACIONAL) {
       std::vector<Individuo> nueva_poblacion;
@@ -171,6 +188,49 @@ ResultMH<tDomain> AlgoritmoGenetico<tDomain>::optimize(
       // --- EL RELEVO ---
       poblacion = nueva_poblacion;
 
+      generaciones++;
+      // --- MEMETICO ---
+      if (generaciones % 10 == 0 &&
+          this->tipo_memetico != TipoMemetico::GENETICO) {
+        LocalSearch<double> ls(0.15);
+
+        if (this->tipo_memetico == TipoMemetico::ALL) {
+          for (int i = 0; i < this->tamPoblacion; i++) {
+            auto resultado = ls.optimize(problem, poblacion[i].cromosomas, 100);
+
+            poblacion[i].cromosomas = resultado.solution;
+            poblacion[i].fitness = resultado.fitness;
+
+            evaluaciones += resultado.evaluations;
+          }
+
+        } else if (this->tipo_memetico == TipoMemetico::RAND) {
+          for (int i = 0; i < this->tamPoblacion; i++) {
+            if (Random::get(0.0, 1.0) <= 0.1) {
+              auto resultado =
+                  ls.optimize(problem, poblacion[i].cromosomas, 100);
+
+              poblacion[i].cromosomas = resultado.solution;
+              poblacion[i].fitness = resultado.fitness;
+
+              evaluaciones += resultado.evaluations;
+            }
+          }
+
+        } else if (this->tipo_memetico == TipoMemetico::BEST) {
+          std::sort(poblacion.begin(), poblacion.end(),
+                    std::greater<Individuo>());
+
+          for (int i = 0; i < 10; i++) {
+            auto resultado = ls.optimize(problem, poblacion[i].cromosomas, 100);
+
+            poblacion[i].cromosomas = resultado.solution;
+            poblacion[i].fitness = resultado.fitness;
+
+            evaluaciones += resultado.evaluations;
+          }
+        }
+      }
     } else {
       Individuo p1 = torneo(poblacion, 2);
       Individuo p2 = torneo(poblacion, 2);
@@ -180,8 +240,8 @@ ResultMH<tDomain> AlgoritmoGenetico<tDomain>::optimize(
 
       if (Random::get(0.0, 1.0) <=
           this->pCruce) {  // En este caso, siempre lo hara, lo dejo
-        auto cruzados =
-            cruzar(p1, p2, problem, evaluaciones);  // por si se quiere cambiar
+        auto cruzados = cruzar(p1, p2, problem,
+                               evaluaciones);  // por si se quiere cambiar
         h1 = cruzados.first;
         h2 = cruzados.second;
       } else {
