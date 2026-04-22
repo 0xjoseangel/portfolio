@@ -194,8 +194,10 @@ ResultMH<tDomain> AlgoritmoGenetico<tDomain>::optimize(
           this->tipo_memetico != TipoMemetico::GENETICO) {
         LocalSearch<double> ls(0.15);
 
+        int pop_size = (int)poblacion.size();
+
         if (this->tipo_memetico == TipoMemetico::ALL) {
-          for (int i = 0; i < this->tamPoblacion; i++) {
+          for (int i = 0; i < pop_size; i++) {
             auto resultado = ls.optimize(problem, poblacion[i].cromosomas, 100);
 
             poblacion[i].cromosomas = resultado.solution;
@@ -205,7 +207,7 @@ ResultMH<tDomain> AlgoritmoGenetico<tDomain>::optimize(
           }
 
         } else if (this->tipo_memetico == TipoMemetico::RAND) {
-          for (int i = 0; i < this->tamPoblacion; i++) {
+          for (int i = 0; i < pop_size; i++) {
             if (Random::get(0.0, 1.0) <= 0.1) {
               auto resultado =
                   ls.optimize(problem, poblacion[i].cromosomas, 100);
@@ -221,7 +223,7 @@ ResultMH<tDomain> AlgoritmoGenetico<tDomain>::optimize(
           std::sort(poblacion.begin(), poblacion.end(),
                     std::greater<Individuo>());
 
-          for (int i = 0; i < 10; i++) {
+          for (int i = 0; i < std::min(10, pop_size); i++) {
             auto resultado = ls.optimize(problem, poblacion[i].cromosomas, 100);
 
             poblacion[i].cromosomas = resultado.solution;
