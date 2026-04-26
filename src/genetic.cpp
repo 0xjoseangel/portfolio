@@ -149,7 +149,8 @@ ResultMH<tDomain> AlgoritmoGenetico<tDomain>::optimize(
     if (this->esquema == TipoEsquema::GENERACIONAL) {
       std::vector<Individuo> nueva_poblacion;
 
-      for (int i = 0; i < 50 && evaluaciones < maxevals; ++i) {
+      for (int i = 0; i < this->tamPoblacion / 2 && evaluaciones < maxevals;
+           ++i) {
         Individuo p1 = torneo(poblacion, 2);
         Individuo p2 = torneo(poblacion, 2);
 
@@ -185,7 +186,7 @@ ResultMH<tDomain> AlgoritmoGenetico<tDomain>::optimize(
         *peor_hijo_it = *mejor_padre_it;
       }
 
-      // --- EL RELEVO ---
+      // --- RELEVO ---
       poblacion = nueva_poblacion;
 
       generaciones++;
@@ -197,8 +198,9 @@ ResultMH<tDomain> AlgoritmoGenetico<tDomain>::optimize(
         int pop_size = (int)poblacion.size();
 
         if (this->tipo_memetico == TipoMemetico::ALL) {
-          for (int i = 0; i < pop_size; i++) {
-            auto resultado = ls.optimize(problem, poblacion[i].cromosomas, 100);
+          for (int i = 0; i < pop_size && evaluaciones < maxevals; i++) {
+            int budget = std::min(100, maxevals - evaluaciones);
+            auto resultado = ls.optimize(problem, poblacion[i].cromosomas, budget);
 
             poblacion[i].cromosomas = resultado.solution;
             poblacion[i].fitness = resultado.fitness;
@@ -207,10 +209,11 @@ ResultMH<tDomain> AlgoritmoGenetico<tDomain>::optimize(
           }
 
         } else if (this->tipo_memetico == TipoMemetico::RAND) {
-          for (int i = 0; i < pop_size; i++) {
+          for (int i = 0; i < pop_size && evaluaciones < maxevals; i++) {
             if (Random::get(0.0, 1.0) <= 0.1) {
+              int budget = std::min(100, maxevals - evaluaciones);
               auto resultado =
-                  ls.optimize(problem, poblacion[i].cromosomas, 100);
+                  ls.optimize(problem, poblacion[i].cromosomas, budget);
 
               poblacion[i].cromosomas = resultado.solution;
               poblacion[i].fitness = resultado.fitness;
@@ -223,8 +226,9 @@ ResultMH<tDomain> AlgoritmoGenetico<tDomain>::optimize(
           std::sort(poblacion.begin(), poblacion.end(),
                     std::greater<Individuo>());
 
-          for (int i = 0; i < std::min(10, pop_size); i++) {
-            auto resultado = ls.optimize(problem, poblacion[i].cromosomas, 100);
+          for (int i = 0; i < std::min(10, pop_size) && evaluaciones < maxevals; i++) {
+            int budget = std::min(100, maxevals - evaluaciones);
+            auto resultado = ls.optimize(problem, poblacion[i].cromosomas, budget);
 
             poblacion[i].cromosomas = resultado.solution;
             poblacion[i].fitness = resultado.fitness;
@@ -274,7 +278,7 @@ ResultMH<tDomain> AlgoritmoGenetico<tDomain>::optimize(
     }
   }
 
-  // --- 3. EL RETORNO ---
+  // --- RETORNO ---
   // Al terminar, buscaremos al mejor de la población y lo devolveremos
 
   auto mejor = std::max_element(poblacion.begin(), poblacion.end());
