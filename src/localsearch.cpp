@@ -26,6 +26,7 @@ template <typename tDomain>
 ResultMH<tDomain> LocalSearch<tDomain>::optimize(Problem<tDomain>& problem,
                                                  int maxevals) {
   int N = problem.getSolutionSize();
+  auto [lo, hi] = problem.getSolutionDomainRange();
   auto P = generatePairs(N);
 
   auto solucion_actual = problem.createSolution();
@@ -49,12 +50,14 @@ ResultMH<tDomain> LocalSearch<tDomain>::optimize(Problem<tDomain>& problem,
       int destino = P[k].second;
 
       double cantidad = solucion_actual[origen] * this->proportion;
+      cantidad = std::min(cantidad, solucion_actual[origen] - lo);
+      cantidad = std::min(cantidad, hi - solucion_actual[destino]);
+
+      if (cantidad <= 1e-15) continue;
+
       solucion_nueva[origen] -= cantidad;
       solucion_nueva[destino] += cantidad;
 
-      // Aunque sume de un lado y lo reste de otro y la suma siga siendo 1.0
-      // se pueden romper los limites
-      problem.fix(solucion_nueva);
       double fitness_nueva = problem.fitness(solucion_nueva);
       evals++;
 
@@ -68,13 +71,14 @@ ResultMH<tDomain> LocalSearch<tDomain>::optimize(Problem<tDomain>& problem,
     }
   }
 
-  return {solucion_actual, fitness_actual, evals};
+  return {solucion_actual, static_cast<tFitness>(fitness_actual), static_cast<unsigned int>(evals)};
 }
 template <typename tDomain>
 ResultMH<tDomain> LocalSearch<tDomain>::optimize(
     Problem<tDomain>& problem, tSolution<tDomain> solucion_inicial,
     int maxevals) {
   int N = problem.getSolutionSize();
+  auto [lo, hi] = problem.getSolutionDomainRange();
   auto P = generatePairs(N);
 
   auto solucion_actual = solucion_inicial;
@@ -98,12 +102,14 @@ ResultMH<tDomain> LocalSearch<tDomain>::optimize(
       int destino = P[k].second;
 
       double cantidad = solucion_actual[origen] * this->proportion;
+      cantidad = std::min(cantidad, solucion_actual[origen] - lo);
+      cantidad = std::min(cantidad, hi - solucion_actual[destino]);
+
+      if (cantidad <= 1e-15) continue;
+
       solucion_nueva[origen] -= cantidad;
       solucion_nueva[destino] += cantidad;
 
-      // Aunque sume de un lado y lo reste de otro y la suma siga siendo 1.0
-      // se pueden romper los limites
-      problem.fix(solucion_nueva);
       double fitness_nueva = problem.fitness(solucion_nueva);
       evals++;
 
@@ -117,7 +123,7 @@ ResultMH<tDomain> LocalSearch<tDomain>::optimize(
     }
   }
 
-  return {solucion_actual, fitness_actual, evals};
+  return {solucion_actual, static_cast<tFitness>(fitness_actual), static_cast<unsigned int>(evals)};
 }
 
 template class LocalSearch<double>;
