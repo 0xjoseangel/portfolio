@@ -23,3 +23,6 @@ include_directories("common" "inc")
 
 add_executable(main "main.cpp" ${C_SOURCES})
 target_link_libraries(main PUBLIC OpenMP::OpenMP_CXX)
+
+add_executable(study_blx_alpha "main_blx_alpha.cpp" ${C_SOURCES})
+target_link_libraries(study_blx_alpha PUBLIC OpenMP::OpenMP_CXX)

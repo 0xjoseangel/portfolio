@@ -6,10 +6,12 @@
 #include <randomSearch.h>
 
 #include <chrono>
+#include <cmath>
 #include <fstream>
 #include <iomanip>
 #include <iostream>
 #include <random.hpp>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -57,7 +59,6 @@ vector<RunResult> runAlgorithm(Alg& alg, PortfolioProblem& problem,
   return results;
 }
 
-// Calcula media de un campo extraído con una lambda
 template <typename F>
 double mean(const vector<RunResult>& v, F field) {
   double s = 0;
@@ -65,27 +66,55 @@ double mean(const vector<RunResult>& v, F field) {
   return s / v.size();
 }
 
+template <typename F>
+double stddev(const vector<RunResult>& v, F field) {
+  double m = mean(v, field);
+  double s = 0;
+  for (auto& r : v) {
+    double d = field(r) - m;
+    s += d * d;
+  }
+  return std::sqrt(s / v.size());
+}
+
 void printTable(const string& dataset_name,
                 const vector<pair<string, vector<RunResult>>>& alg_results) {
-  cout << "\n=== Tabla de resultados: " << dataset_name << " (medias, "
+  cout << "\n=== Tabla de resultados: " << dataset_name << " (medias ± desv.típ., "
        << N_SEEDS << " semillas) ===\n";
-  cout << left << setw(10) << "Algoritmo" << right << setw(12) << "Fit.Train"
-       << setw(12) << "Fit.2025" << setw(12) << "Ben.2025" << setw(14)
-       << "Evaluaciones" << setw(10) << "Tiempo(s)" << "\n";
-  cout << string(70, '-') << "\n";
+  // Cabecera: media ± σ para Fit.Train y Fit.2025; resto igual
+  cout << left << setw(10) << "Algoritmo"
+       << right << setw(22) << "Fit.Train (±σ)"
+       << setw(22) << "Fit.2025 (±σ)"
+       << setw(12) << "Ben.2025"
+       << setw(14) << "Evaluaciones"
+       << setw(10) << "Tiempo(s)" << "\n";
+  cout << string(90, '-') << "\n";
 
-  for (auto& [name, res] : alg_results) {
-    cout << left << setw(10) << name << right << fixed << setprecision(4)
-         << setw(12)
-         << mean(res, [](const RunResult& r) { return r.fitness_train; })
-         << setw(12)
-         << mean(res, [](const RunResult& r) { return r.fitness_test; })
-         << setw(12)
-         << mean(res, [](const RunResult& r) { return r.beneficio_test; })
-         << setw(14) << fixed << setprecision(1)
-         << mean(res, [](const RunResult& r) { return (double)r.evaluations; })
-         << setw(10) << fixed << setprecision(3)
-         << mean(res, [](const RunResult& r) { return r.time_sec; }) << "\n";
+  for (auto& entry : alg_results) {
+    const string& name     = entry.first;
+    const vector<RunResult>& res = entry.second;
+
+    auto f_train = [](const RunResult& r) { return r.fitness_train; };
+    auto f_test  = [](const RunResult& r) { return r.fitness_test; };
+    auto f_ben   = [](const RunResult& r) { return r.beneficio_test; };
+    auto f_evals = [](const RunResult& r) { return (double)r.evaluations; };
+    auto f_time  = [](const RunResult& r) { return r.time_sec; };
+
+    // "media ±σ" como string para alineación limpia
+    auto fmt = [&](auto field) {
+      ostringstream os;
+      os << fixed << setprecision(4) << mean(res, field)
+         << " ±" << setprecision(4) << stddev(res, field);
+      return os.str();
+    };
+
+    cout << left  << setw(10) << name
+         << right << setw(22) << fmt(f_train)
+                  << setw(22) << fmt(f_test)
+         << fixed << setprecision(4) << setw(12) << mean(res, f_ben)
+                  << setprecision(1) << setw(14) << mean(res, f_evals)
+                  << setprecision(3) << setw(10) << mean(res, f_time)
+         << "\n";
   }
 }
 

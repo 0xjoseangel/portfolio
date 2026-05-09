@@ -60,3 +60,8 @@ data/
 *.swp
 *.swo
 *~
+blx_alpha_ibex_35.csv
+blx_alpha_syp_100.csv
+blx_alpha_syp_500.csv
+results_syp_500.csv
+results_syp_500.csv

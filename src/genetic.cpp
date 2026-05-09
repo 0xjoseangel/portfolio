@@ -4,10 +4,11 @@
 
 template <typename tDomain>
 AlgoritmoGenetico<tDomain>::AlgoritmoGenetico(TipoEsquema e, TipoCruce c,
-                                              TipoMemetico m) {
+                                              TipoMemetico m, double alpha) {
   this->esquema = e;
   this->cruce = c;
   this->tipo_memetico = m;
+  this->alpha = alpha;
 
   if (this->tipo_memetico == TipoMemetico::GENETICO) {
     if (this->esquema == TipoEsquema::ESTACIONARIO) {
@@ -39,11 +40,11 @@ Individuo AlgoritmoGenetico<tDomain>::torneo(
   return mejor;
 }
 
-// Operador intercambio (seminario diap. 13): transfiere el 15% de gene_idx a otro gen
+// transfiere el 15% de gene_idx a otro gen
 template <typename tDomain>
 void AlgoritmoGenetico<tDomain>::mutar(Individuo& ind,
-                                       Problem<tDomain>& problem,
-                                       int gene_idx, int& evaluaciones) {
+                                       Problem<tDomain>& problem, int gene_idx,
+                                       int& evaluaciones) {
   auto [lo, hi] = problem.getSolutionDomainRange();
   int N = (int)ind.cromosomas.size();
 
@@ -71,16 +72,14 @@ std::pair<Individuo, Individuo> AlgoritmoGenetico<tDomain>::cruzar(
   auto h2 = p2;
 
   if (this->cruce == TipoCruce::ARITMETICO) {
-    // r_i independiente por posición (guion Ec.4, seminario diap.14)
+    // r_i independiente por posición
     for (int i = 0; i < problem.getSolutionSize(); ++i) {
       double r = Random::get(0.0, 1.0);
       h1.cromosomas[i] = r * p1.cromosomas[i] + (1 - r) * p2.cromosomas[i];
       h2.cromosomas[i] = r * p2.cromosomas[i] + (1 - r) * p1.cromosomas[i];
     }
-  } else {  // BLX-alpha=0.3
+  } else {  // BLX-alpha (parametrizable, default 0.3)
     auto [lo, hi] = problem.getSolutionDomainRange();
-    double alpha = 0.3;
-
     for (int i = 0; i < problem.getSolutionSize(); ++i) {
       double intervalo = std::abs(p1.cromosomas[i] - p2.cromosomas[i]);
 
@@ -133,7 +132,8 @@ ResultMH<tDomain> AlgoritmoGenetico<tDomain>::optimize(
       }
 
       // --- CRUCE: esperanza matemática, siempre n_cruces parejas fijas ---
-      // Emparejamiento fijo: (0,1), (2,3), ..., la aleatoriedad viene del torneo
+      // Emparejamiento fijo: (0,1), (2,3), ..., la aleatoriedad viene del
+      // torneo
       int n_cruces = (int)(this->pCruce * this->tamPoblacion / 2);
       std::vector<Individuo> nueva_poblacion;
       nueva_poblacion.reserve(this->tamPoblacion);
@@ -154,7 +154,8 @@ ResultMH<tDomain> AlgoritmoGenetico<tDomain>::optimize(
       }
 
       // --- MUTACIÓN: esperanza matemática, siempre n_mut mutaciones fijas ---
-      // n_mut = Pm * M (por individuo para AG, equivalente a Pm_gen * n * M para AM)
+      // n_mut = Pm * M (por individuo para AG, equivalente a Pm_gen * n * M
+      // para AM)
       int n_mut = (int)(this->pMutacion * this->tamPoblacion);
       int pop_actual = (int)nueva_poblacion.size();
       for (int i = 0; i < n_mut && evaluaciones < maxevals; ++i) {

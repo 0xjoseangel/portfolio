@@ -28,6 +28,7 @@ class AlgoritmoGenetico : public MH<tDomain> {
   int tamPoblacion = 100;
   double pCruce;
   double pMutacion;
+  double alpha;
 
   Individuo torneo(const std::vector<Individuo>& poblacion, int k = 3);
   void mutar(Individuo& ind, Problem<tDomain>& problem, int gene_idx, int& evaluaciones);
@@ -38,7 +39,8 @@ class AlgoritmoGenetico : public MH<tDomain> {
 
  public:
   AlgoritmoGenetico(TipoEsquema e, TipoCruce c,
-                    TipoMemetico m = TipoMemetico::GENETICO);
+                    TipoMemetico m = TipoMemetico::GENETICO,
+                    double alpha = 0.3);
   ~AlgoritmoGenetico() override = default;
 
   ResultMH<tDomain> optimize(Problem<tDomain>& problem, int maxevals) override;
