@@ -13,6 +13,8 @@
 \usepackage{graphicx}
 \usepackage{tikz}
 \usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds, calc}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
 \newcommand{\maybeimage}[3]{%
   \IfFileExists{#1}{\includegraphics[#2]{#1}}%
   {\fbox{\parbox{0.7\textwidth}{\centering\vspace{1cm}[Figura pendiente: #3]\vspace{1cm}}}}%
@@ -172,10 +174,12 @@ Se eligen $k=3$ individuos al azar y se devuelve el de mayor fitness.
 \begin{algorithm}[H]
 \caption{Torneo ($k=3$)}
 \KwIn{población $P$} \KwOut{individuo ganador}
-$i_1 \leftarrow$ aleatorio en $[0,|P|-1]$\;
-$i_2 \leftarrow$ aleatorio en $[0,|P|-1]$\;
-$i_3 \leftarrow$ aleatorio en $[0,|P|-1]$\;
-\KwReturn{$P[\arg\max_{k\in\{i_1,i_2,i_3\}} P[k].\text{fitness}]$}
+$mejor \leftarrow P[\text{aleatorio en } [0,|P|-1]]$\;
+\Para{$i \leftarrow 1$ \KwTo $3$}{
+  $rival \leftarrow P[\text{aleatorio en } [0,|P|-1]]$\;
+  \Si{$rival.\text{fitness} > mejor.\text{fitness}$}{$mejor \leftarrow rival$\;}
+}
+\KwReturn{$mejor$}
 \end{algorithm}
 
 \subsection{Operadores de cruce}
@@ -223,50 +227,51 @@ Ambos hijos se generan uniformemente en $[\max(0,hmin_i),\min(hi,hmax_i)]$, $\al
 
 \subsection{Operador de mutación}
 
-\subsubsection*{Para Algoritmos Genéticos}
-
-El operador de mutación para los AGs usa un \textbf{intercambio} entre dos genes, lo que
-preserva la restricción $\sum w_i = 1$ y los límites $[lo,hi]$ por construcción, sin
-necesidad de \fix{}.
-Con probabilidad $p_m=0{,}1$ por individuo se aplica la mutación de intercambio.
+El operador base es el \textbf{intercambio}: transfiere el 15\% del peso de un gen a otro, preservando $\sum w_i=1$ y los límites $[lo,hi]$ por construcción, sin necesidad de \fix{}.
 
 \begin{algorithm}[H]
-\caption{Mutación AG($ind$, problema)}
-\Si{rand() $\leq 0{,}1$}{
-  $gene\_idx \leftarrow$ aleatorio en $[0, N-1]$\;
-  $gene\_j \leftarrow$ aleatorio en $[0, N-1]$, $gene\_j \neq gene\_idx$\;
-  $delta \leftarrow 0{,}15 \cdot w[gene\_idx]$\;
-  $delta \leftarrow \min(delta,\; w[gene\_idx] - lo)$\;
-  $delta \leftarrow \min(delta,\; hi - w[gene\_j])$\;
-  \Si{$delta > 0$}{
-    $w[gene\_idx] \leftarrow w[gene\_idx] - delta$\;
-    $w[gene\_j] \leftarrow w[gene\_j] + delta$\;
-    evaluar fitness; $evals \leftarrow evals + 1$\;
-  }
+\caption{Mutación-intercambio($ind$, $gene\_idx$, problema)}
+\KwIn{individuo $ind$, índice $gene\_idx$, $[lo,hi]$}
+$gene\_j \leftarrow$ aleatorio en $[0, N-2]$\;
+\Si{$gene\_j \geq gene\_idx$}{$gene\_j \leftarrow gene\_j + 1$\;}
+$delta \leftarrow 0{,}15 \cdot ind[gene\_idx]$\;
+$delta \leftarrow \min(delta,\; ind[gene\_idx] - lo)$\;
+$delta \leftarrow \min(delta,\; hi - ind[gene\_j])$\;
+\Si{$delta > \varepsilon$}{
+  $ind[gene\_idx] \leftarrow ind[gene\_idx] - delta$\;
+  $ind[gene\_j] \leftarrow ind[gene\_j] + delta$\;
+  evaluar fitness($ind$); $evals \leftarrow evals + 1$\;
 }
 \end{algorithm}
 
-\subsubsection*{Para Algoritmos Meméticos}
+La forma en que se \textbf{invoca} este operador depende del esquema de evolución, no de si el algoritmo es genético o memético:
 
-En los AMs (basados en AGG), se usa la \textbf{esperanza matemática}: en lugar de
-aplicar la mutación con probabilidad $p_m$ por individuo, se calculan exactamente
-$n_{mut} = \lfloor p_m \cdot N_p \rfloor = \lfloor 0{,}1 \cdot 100 \rfloor = 10$
-mutaciones de intercambio por generación, eligiendo aleatoriamente los pares
-(cromosoma, gen) a mutar.
+\subsubsection*{Esquema estacionario (AGE): probabilístico por individuo}
+
+Con probabilidad $p_m=0{,}1$ por cada hijo generado:
 
 \begin{algorithm}[H]
-\caption{Mutación AM (esperanza matemática)}
-$n_{mut} \leftarrow \lfloor 0{,}1 \cdot N_p \rfloor$\;
-\Para{$k \leftarrow 1$ \KwTo $n_{mut}$}{
-  $chr\_idx \leftarrow$ aleatorio en $[0, N_p-1]$\;
+\caption{Aplicar mutación en AGE($h$, problema)}
+\Si{rand() $\leq p_m$}{
   $gene\_idx \leftarrow$ aleatorio en $[0, N-1]$\;
-  $gene\_j \leftarrow$ aleatorio en $[0, N-1]$, $gene\_j \neq gene\_idx$\;
-  $delta \leftarrow 0{,}15 \cdot P[chr\_idx][gene\_idx]$\;
-  $delta \leftarrow \min(delta,\; P[chr\_idx][gene\_idx] - lo)$\;
-  $delta \leftarrow \min(delta,\; hi - P[chr\_idx][gene\_j])$\;
-  \Si{$delta > 0$}{
-    aplicar intercambio; evaluar fitness; $evals \leftarrow evals + 1$\;
-  }
+  Mutación-intercambio($h$, $gene\_idx$, problema)\;
+}
+\end{algorithm}
+
+\subsubsection*{Esquema generacional (AGG y todos los AMs): esperanza matemática}
+
+Se aplica exactamente $n_{mut} = \lfloor p_m \cdot N_p \rfloor = 10$ mutaciones fijas
+por generación sobre la nueva población $P'$, tanto en AGG-Arit, AGG-BLX como en
+AM-All, AM-Rand y AM-Best (todos comparten el mismo bucle generacional):
+
+\begin{algorithm}[H]
+\caption{Aplicar mutaciones en AGG/AMs (esperanza matemática)}
+$n_{mut} \leftarrow \lfloor p_m \cdot N_p \rfloor$\;
+$pop\_actual \leftarrow |P'|$\;
+\Para{$k \leftarrow 1$ \KwTo $n_{mut}$ \textbf{y} $evals < \text{maxEvals}$}{
+  $chrom\_idx \leftarrow$ aleatorio en $[0,\, pop\_actual - 1]$\;
+  $gene\_idx \leftarrow$ aleatorio en $[0, N-1]$\;
+  Mutación-intercambio($P'[chrom\_idx]$, $gene\_idx$, problema)\;
 }
 \end{algorithm}
 
@@ -284,18 +289,30 @@ con los límites, y si $\delta > 0$ se transfiere esa cantidad de peso de origen
 destino.
 
 \begin{algorithm}[H]
-\caption{Paso de intercambio en la BL (Práctica 2)}
-\KwIn{solución $sol$, proporción $p=0{,}15$, $lo$, $hi$}
-Barajar lista de índices $[0,\ldots,N-1]$\;
-$(origen, destino) \leftarrow$ par aleatorio con $origen \neq destino$\;
-$delta \leftarrow p \cdot sol[origen]$\;
-$delta \leftarrow \min(delta,\; sol[origen] - lo)$\quad \textit{// no puede bajar de lo}\;
-$delta \leftarrow \min(delta,\; hi - sol[destino])$\quad \textit{// no puede superar hi}\;
-\Si{$delta > 0$}{
-  $sol[origen] \leftarrow sol[origen] - delta$\;
-  $sol[destino] \leftarrow sol[destino] + delta$\;
-  evaluar fitness\;
+\caption{BL($sol\_inicial$, problema, maxEvals, $p=0{,}15$)}
+\KwIn{solución inicial, problema, maxEvals, proporción $p$}
+\KwOut{solución, fitness, evals}
+$Pares \leftarrow \{(i,j) : i \neq j,\; i,j \in [0,N-1]\}$\quad \textit{// $N(N-1)$ pares}\;
+$sol \leftarrow sol\_inicial$\;
+$fitness \leftarrow$ evaluar($sol$); $evals \leftarrow 1$\;
+$mejora \leftarrow$ verdadero\;
+\Mientras{$mejora$ \textbf{y} $evals < \text{maxEvals}$}{
+  $mejora \leftarrow$ falso\;
+  Barajar $Pares$ aleatoriamente\;
+  \Para{cada $(origen, destino)$ en $Pares$ \textbf{y} $evals < \text{maxEvals}$}{
+    $delta \leftarrow p \cdot sol[origen]$\;
+    $delta \leftarrow \min(delta,\; sol[origen] - lo)$\;
+    $delta \leftarrow \min(delta,\; hi - sol[destino])$\;
+    \Si{$delta \leq \varepsilon$}{\textbf{continuar}\;}
+    $sol' \leftarrow sol$;\quad $sol'[origen] \mathrel{-}= delta$;\quad $sol'[destino] \mathrel{+}= delta$\;
+    $fit' \leftarrow$ evaluar($sol'$); $evals \leftarrow evals + 1$\;
+    \Si{$fit' > fitness$}{
+      $sol \leftarrow sol'$; $fitness \leftarrow fit'$\;
+      $mejora \leftarrow$ verdadero; \textbf{romper}\;
+    }
+  }
 }
+\KwReturn{$sol$, $fitness$, $evals$}
 \end{algorithm}
 
 %-----------------------------------------------------------------------
@@ -305,7 +322,7 @@ $delta \leftarrow \min(delta,\; hi - sol[destino])$\quad \textit{// no puede sup
 \subsection{Algoritmo Genético Generacional (AGG)}
 
 \subsubsection*{Parámetros}
-$N_p=100$, $p_c=0{,}8$, $p_m=0{,}1$ por individuo, criterio de parada: $10\,000$ evaluaciones.
+$N_p=100$, $p_c=0{,}8$, $p_m=0{,}1$ (equivale a $n_c=40$ cruces y $n_m=10$ mutaciones fijas/generación), criterio de parada: $10\,000$ evaluaciones.
 
 \subsubsection*{Esquema de evolución y reemplazamiento}
 
@@ -318,17 +335,20 @@ individuos elegidos aleatoriamente.
 \begin{algorithm}[H]
 \caption{AGG (generacional con elitismo, esperanza matemática)}
 \KwIn{problema, maxEvals} \KwOut{mejor solución}
-Inicializar $P$ con $N_p$ individuos aleatorios; $evals \leftarrow N_p$\;
+Inicializar $P$ con $N_p$ aleatorios; $evals \leftarrow N_p$\;
 \Mientras{$evals < \text{maxEvals}$}{
-  Seleccionar $N_p$ padres mediante $N_p$ llamadas a \torneo{$P$}\;
-  $n_{cruces} \leftarrow \lfloor 0{,}8 \cdot N_p / 2 \rfloor = 40$\;
-  \Para{$i \leftarrow 1$ \KwTo $N_p/2$}{
-    \Si{$i \leq n_{cruces}$}{$(h_1,h_2)\leftarrow$\cruzar{$p_{2i-1},p_{2i}$}; $evals \mathrel{+}= 2$}
-    \SiNo{$h_1\leftarrow p_{2i-1}$; $h_2\leftarrow p_{2i}$}
-    $P'\leftarrow P'\cup\{h_1,h_2\}$\;
+  $padres \leftarrow [$ \torneo{$P$} $\times N_p]$;\quad $n_c \leftarrow \lfloor p_c \cdot N_p/2 \rfloor$;\quad $P' \leftarrow \emptyset$\;
+  \Para{$i \leftarrow 0$ \KwTo $N_p/2-1$ \textbf{y} $evals<\text{maxEvals}$}{
+    $p_1 \leftarrow padres[2i]$;\quad $p_2 \leftarrow padres[2i{+}1]$\;
+    \Si{$i < n_c$}{$(h_1,h_2)\leftarrow \mathrm{cruzar}(p_1,p_2)$;\quad $evals\leftarrow evals+2$\;}
+    \OSiNo{$h_1\leftarrow p_1$;\quad $h_2\leftarrow p_2$\;}
+    Añadir $h_1,h_2$ a $P'$\;
   }
-  Aplicar exactamente $n_{mut}=10$ mutaciones de intercambio a individuos aleatorios de $P'$\;
-  \Si{$\max(P').\text{fitness} < \max(P).\text{fitness}$}{$\min(P')\leftarrow\max(P)$}
+  $n_m \leftarrow \lfloor p_m \cdot N_p \rfloor$;\quad
+  \Para{$k \leftarrow 0$ \KwTo $n_m-1$ \textbf{y} $evals<\text{maxEvals}$}{
+    $chr\leftarrow$ rand $[0,|P'|{-}1]$;\quad $g\leftarrow$ rand $[0,N{-}1]$;\quad Mutación-intercambio($P'[chr],g$)\;
+  }
+  \Si{$\max(P').fit < \max(P).fit$}{$\min(P') \leftarrow \max(P)$\;}
   $P \leftarrow P'$\;
 }
 \KwReturn{$\max(P)$}
@@ -345,9 +365,9 @@ Se implementan dos variantes: \textbf{AGG-Arit} y \textbf{AGG-BLX}.
   arr/.style={-{Stealth[length=2.5mm]}, thick}
 ]
 \node[blk, fill=lightPop, draw=colPop] (P) {Población $P(t)$ \\ $N_p=100$};
-\node[blk, fill=lightSel, draw=colSel, right=of P] (sel) {Selección \\ Torneo ($\times 2$)};
-\node[blk, fill=lightCross, draw=colCross, right=of sel] (cru) {Cruce \\ $p_c=0.8$};
-\node[blk, fill=lightMut, draw=colMut, right=of cru] (mut) {Mutación \\ $p_m=0.1$/ind};
+\node[blk, fill=lightSel, draw=colSel, right=of P] (sel) {Selección \\ Torneo ($\times N_p$)};
+\node[blk, fill=lightCross, draw=colCross, right=of sel] (cru) {Cruce \\ $n_c=40$ fijos};
+\node[blk, fill=lightMut, draw=colMut, right=of cru] (mut) {Mutación \\ $n_m=10$ fijos};
 \node[blk, fill=lightPop, draw=colPop, right=of mut] (Pp) {Nueva $P'$ \\ $N_p=100$};
 \node[blk, fill=lightBL, draw=colBL, below=1.5cm of cru] (elit) {Elitismo \\ mejor$(P)\to$ peor$(P')$};
 \draw[arr] (P)--(sel); \draw[arr] (sel)--(cru); \draw[arr] (cru)--(mut); \draw[arr] (mut)--(Pp);
@@ -372,16 +392,22 @@ criterio de parada: $10\,000$ evaluaciones.
 \begin{algorithm}[H]
 \caption{AGE (estacionario)}
 \KwIn{problema, maxEvals} \KwOut{mejor solución}
-Inicializar $P$ con $N_p$ individuos aleatorios; $evals \leftarrow N_p$\;
+Inicializar $P$ con $N_p$ aleatorios; $evals \leftarrow N_p$\;
 \Mientras{$evals < \text{maxEvals}$}{
-  $p_1\leftarrow$\torneo{$P$}; $p_2\leftarrow$\torneo{$P$}\;
-  $(h_1,h_2)\leftarrow$\cruzar{$p_1,p_2$}; $evals \mathrel{+}= 2$\;
-  \mutar{$h_1$}; \mutar{$h_2$}\;
-  \Si{$h_1.\text{fitness}>\min(P).\text{fitness}$}{$\min(P)\leftarrow h_1$}
-  \Si{$h_2.\text{fitness}>\min(P).\text{fitness}$}{$\min(P)\leftarrow h_2$}
+  $p_1\leftarrow$\torneo{$P$};\quad $p_2\leftarrow$\torneo{$P$}\;
+  \Si{rand() $\leq p_c$}{$(h_1,h_2)\leftarrow \mathrm{cruzar}(p_1,p_2)$;\quad $evals\leftarrow evals+2$\;}
+  \OSiNo{$h_1\leftarrow p_1$;\quad $h_2\leftarrow p_2$\;}
+  \Si{rand() $\leq p_m$}{$g\leftarrow$rand$[0,N{-}1]$;\quad Mutación-intercambio($h_1,g$)\;}
+  \Si{rand() $\leq p_m$}{$g\leftarrow$rand$[0,N{-}1]$;\quad Mutación-intercambio($h_2,g$)\;}
+  $peor_1\leftarrow\min(P)$\;
+  \Si{$h_1.fit > peor_1.fit$}{$peor_1\leftarrow h_1$\;}
+  $peor_2\leftarrow\min(P)$\;
+  \Si{$h_2.fit > peor_2.fit$}{$peor_2\leftarrow h_2$\;}
 }
 \KwReturn{$\max(P)$}
 \end{algorithm}
+
+\textit{El $\min(P)$ se recalcula para $h_2$ después de la posible inserción de $h_1$.}
 
 Se implementan dos variantes: \textbf{AGE-Arit} y \textbf{AGE-BLX}.
 
@@ -418,8 +444,14 @@ por llamada. La BL se aplica \textbf{cada 10 generaciones}; el presupuesto de ca
 es $\min(100,\,\text{maxEvals}-evals)$ para respetar el límite global de $10\,000$
 evaluaciones (incluidas las de la BL).
 
+Los AMs comparten \textbf{exactamente el mismo bucle generacional que el AGG}: misma
+selección ($N_p$ torneos, $k=3$), mismo cruce con esperanza matemática ($n_c=40$ pares fijos),
+mismo emparejamiento fijo, misma mutación con esperanza matemática ($n_m=10$ fijos) y
+mismo elitismo. La única diferencia estructural es el bloque de BL que se activa
+cada 10 generaciones según el criterio de cada variante.
+
 \subsubsection*{Parámetros comunes}
-$N_p=100$, $p_c=0{,}8$, $p_m=0{,}1/N$ por gen.
+$N_p=100$, $p_c=0{,}8$, $p_m=0{,}1/N$ por gen (equivale a $n_m=10$ mutaciones/generación).
 
 \subsubsection*{AM-All: BL a todos los individuos}
 \begin{algorithm}[H]
@@ -492,19 +524,34 @@ $N_p=100$, $p_c=0{,}8$, $p_m=0{,}1/N$ por gen.
 
 \begin{verbatim}
 portfolio/
-  main.cpp          src/portfolioProblem.cpp, randomSearch.cpp
-  CMakeLists.txt    src/greedy.cpp, localsearch.cpp, genetic.cpp
-  data/             inc/portfolioProblem.h, randomSearch.h
-    ibex_35.csv         greedy.h, localsearch.h, genetic.h
-    syp_100.csv     common/mh.h, problem.h, random.hpp, util.h
-    syp_500.csv
+  main.cpp               -- Experimentos principales (10 algoritmos x 3 datasets)
+  main_blx_alpha.cpp     -- Trabajo voluntario: estudio del parámetro alpha en BLX
+  CMakeLists.txt         -- Genera ejecutables: main y study_blx_alpha
+  data/
+    ibex_35.csv, syp_100.csv, syp_500.csv
+  src/
+    portfolioProblem.cpp -- Problema, fitness, fix, createSolution
+    genetic.cpp          -- AGG, AGE, AM-All, AM-Rand, AM-Best
+    localsearch.cpp      -- BL con operador intercambio (sin fix por vecino)
+    greedy.cpp
+    randomSearch.cpp
+  inc/
+    portfolioProblem.h, genetic.h, localsearch.h, greedy.h, randomSearch.h
+  common/
+    mh.h, problem.h, solution.h, random.hpp, util.h
 \end{verbatim}
 
 \textbf{Compilación y ejecución:}
 \begin{verbatim}
-cmake .  &&  make
-./main [max_evals] [n_seeds]   # defecto: 10000 evals, 50 semillas
-./study_blx_alpha               # estudio del parámetro alpha de BLX
+cmake -S . -B build
+cmake --build build
+
+./build/main [max_evals] [n_seeds]          # defecto: 10000 evals, 50 semillas
+./build/study_blx_alpha [max_evals] [n_seeds]   # estudio alpha BLX
+
+# Genera CSV: results_ibex_35.csv, results_syp_100.csv, results_syp_500.csv
+#             blx_alpha_ibex_35.csv, blx_alpha_syp_100.csv, blx_alpha_syp_500.csv
+python3 boxplot.py    # genera boxplots desde los CSV
 \end{verbatim}
 
 %-----------------------------------------------------------------------
@@ -711,56 +758,146 @@ el primer óptimo local que encuentra, sin capacidad de exploración global.
 Los AGs y AMs, en cambio, mantienen una población diversa que explora múltiples regiones
 del espacio simultáneamente, siendo mucho más efectivos para $N$ grande.
 
-\subsection{Análisis de la variabilidad ($\sigma$)}
+\subsection{Análisis de la variabilidad ($\sigma$) en AGs y AMs}
 
-Las desviaciones típicas de las tablas de resultados revelan patrones relevantes:
+Los algoritmos de esta práctica (AGs y AMs) muestran patrones de variabilidad
+muy distintos entre sí, directamente relacionados con su diseño:
+
+\subsubsection*{Variabilidad entre operadores de cruce}
+
+El cruce BLX produce consistentemente \textbf{menor varianza que el Aritmético}
+en ambos esquemas y los tres datasets:
+
+\begin{center}\footnotesize
+\begin{tabular}{lcc|cc|cc}
+\toprule
+ & \multicolumn{2}{c|}{\textbf{ibex\_35}} & \multicolumn{2}{c|}{\textbf{syp\_100}} & \multicolumn{2}{c}{\textbf{syp\_500}} \\
+ & Arit $\sigma$ & BLX $\sigma$ & Arit $\sigma$ & BLX $\sigma$ & Arit $\sigma$ & BLX $\sigma$ \\
+\midrule
+AGG & $0.050$ & $0.018$ & $0.040$ & $0.038$ & $0.073$ & $0.043$ \\
+AGE & $0.036$ & $0.012$ & $0.054$ & $0.042$ & $0.069$ & $0.044$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+BLX, al explorar más allá del convex hull de los padres, guía la búsqueda hacia
+regiones más prometedoras de forma más consistente, reduciendo la sensibilidad a la
+semilla inicial. El cruce Aritmético, puramente explotativo, queda más atrapado
+en la cuenca de atracción de la solución inicial.
+
+\subsubsection*{Variabilidad entre esquemas: AGG vs AGE}
+
+AGE presenta \textbf{menor $\sigma$ que AGG} en ibex\_35 y syp\_100 para ambos
+operadores de cruce. El esquema estacionario, al reemplazar solo 0--2 individuos por
+iteración, mantiene una élite implícita grande que estabiliza la búsqueda. AGG, al
+regenerar toda la población cada generación, introduce mayor variabilidad generación
+a generación. En syp\_500 la diferencia de $\sigma$ es mínima entre AGG y AGE,
+dominando el efecto de la dimensionalidad.
+
+\subsubsection*{Variabilidad de los AMs: efecto de la estrategia de BL}
+
+Es en los AMs donde la $\sigma$ muestra las diferencias más extremas:
 
 \begin{itemize}
-  \item \textbf{AM-Rand y AM-Best} presentan $\sigma \approx 0.001$ en ibex\_35, lo que
-  indica un comportamiento casi determinístico: todas las semillas convergen al mismo
-  óptimo. La pequeña dimensionalidad ($N=30$) combinada con la BL selectiva produce una
-  convergencia muy robusta.
+  \item \textbf{AM-Rand y AM-Best}: $\sigma \approx 0.001$ en ibex\_35 — el resultado
+  más llamativo de toda la práctica. Todas las semillas convergen al mismo óptimo
+  independientemente del punto de inicio. La BL selectiva (aplicada a 10 individuos
+  ya maduros evolutivamente) combina exploración global del AGG con explotación local
+  precisa, encontrando siempre el mismo atractor. En syp\_100 y syp\_500 la varianza
+  sube ($\sigma \approx 0.03$--$0.04$) pero sigue siendo la más baja de todos los
+  algoritmos evolutivos.
 
-  \item \textbf{BL} tiene $\sigma = 0.164$ en syp\_500, la mayor variabilidad entre todos
-  los algoritmos en ese dataset. Esto confirma que en alta dimensión, la BL es muy
-  sensible a la solución inicial: diferentes semillas llevan a óptimos locales muy
-  dispares, sin que el operador pueda escapar de ellos.
-
-  \item \textbf{Random} tiene $\sigma = 0.193$ en Fit.2025 para syp\_100, la mayor
-  variabilidad global. Refleja la aleatoriedad pura sin ningún mecanismo de mejora.
-
-  \item \textbf{Greedy} tiene $\sigma = 0.000$ en todos los datasets (determinístico).
+  \item \textbf{AM-All}: paradójicamente, tiene la \textbf{mayor $\sigma$ de los AMs}
+  en syp\_100 ($0.045$) y syp\_500 ($0.040$), mayor incluso que algunos AGs puros. Al
+  aplicar BL a los 100 individuos en generación 10 — cuando la población aún está
+  inmadura —, el resultado queda fuertemente ligado a la calidad de esa población inicial,
+  que varía mucho según la semilla. Los AGs puros son más estables porque no dependen de
+  una fase de BL temprana.
 \end{itemize}
+
+\subsubsection*{Comparación de tiempos (AGs y AMs)}
+
+\begin{center}\footnotesize
+\begin{tabular}{lccc}
+\toprule
+\textbf{Algoritmo} & \textbf{ibex\_35 (s)} & \textbf{syp\_100 (s)} & \textbf{syp\_500 (s)} \\
+\midrule
+AGG-Arit & $0.006$ & $0.021$ & $0.367$ \\
+AGG-BLX  & $0.008$ & $0.033$ & $0.388$ \\
+AGE-Arit & $0.006$ & $0.022$ & $0.360$ \\
+AGE-BLX  & $0.009$ & $0.031$ & $0.379$ \\
+AM-All   & $0.020$ & $0.200$ & $3.489$ \\
+AM-Rand  & $0.011$ & $0.105$ & $1.612$ \\
+AM-Best  & $0.010$ & $0.100$ & $1.485$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Los AGs puros son los más rápidos: AGG y AGE tienen tiempos similares ya que ejecutan
+el mismo número de evaluaciones de fitness ($\approx$10\,000) con la misma función de
+coste. BLX es ligeramente más lento que Aritmético por el cálculo adicional de
+$[hmin_i, hmax_i]$ por posición.
+
+AM-All es el AM más lento con diferencia ($3.489$s en syp\_500 vs $\approx$0.38s de los
+AGs): aplica BL a los 100 individuos, y con syp\_500 cada llamada a BL es costosa
+($N=457$, evaluación $O(N^2)$). AM-Rand y AM-Best son intermedios y similares entre sí,
+ya que ambos aplican BL a $\approx$10 individuos por fase memetica.
 
 \subsection{Análisis de los boxplots}
 
-Los boxplots (Figuras~\ref{fig:box_ibex}--\ref{fig:box_syp500}) confirman visualmente
-los resultados numéricos:
+Los boxplots (Figuras~\ref{fig:box_ibex}--\ref{fig:box_syp500}) permiten observar
+tanto la calidad media como la consistencia de cada algoritmo:
 
 \begin{itemize}
-  \item \textbf{Greedy}: línea única sin varianza (determinístico). En ibex\_35 ofrece
-  buen valor medio, pero en syp\_100 y syp\_500 es el peor algoritmo, reflejando que
-  la solución voraz colapsa cuando $N$ crece.
+  \item \textbf{Greedy}: línea única sin caja (completamente determinístico). En
+  ibex\_35 su valor es competitivo ($-4.650$), pero en syp\_100 y syp\_500 aparece
+  cortado en la parte inferior del gráfico, siendo el peor de todos: la heurística voraz
+  colapsa en espacios de alta dimensión.
 
-  \item \textbf{Random}: cajas anchas con bigotes largos y outliers frecuentes,
-  confirmando la alta varianza. En ibex\_35 aparecen outliers superiores (semillas que
-  por azar aciertan buenas combinaciones).
+  \item \textbf{Random}: caja amplia con bigotes largos y outliers en los tres datasets,
+  confirmando su alta sensibilidad a la semilla. En ibex\_35 aparecen outliers superiores
+  (semillas que por azar generan buenas combinaciones iniciales).
 
-  \item \textbf{BL}: caja compacta en ibex\_35 y syp\_100, pero caja notablemente más
-  ancha en syp\_500, reflejando la alta sensibilidad a la inicialización en alta
-  dimensión ($\sigma = 0.164$).
+  \item \textbf{BL}: la \textbf{Búsqueda Local empleada en esta práctica es la versión
+  corregida respecto a la Práctica~1}: el operador de intercambio preserva las
+  restricciones por construcción, eliminando las llamadas innecesarias a \texttt{fix()}
+  que distorsionaban el vecindario. Esta corrección es visible en la consistencia de los
+  resultados.
 
-  \item \textbf{AGs}: varianza baja y homogénea entre variantes. BLX tiene medianas
-  superiores a Aritmético en todos los datasets. AGG supera a AGE en syp\_500 con una
-  diferencia claramente visible en los boxplots.
+  En \textbf{ibex\_35} la caja es la más compacta del gráfico ($\sigma=0.019$): BL
+  converge siempre al mismo óptimo local en solo $\approx$1\,257 evals, lo que confirma
+  un paisaje de fitness suave con un atractor dominante. En \textbf{syp\_100} la caja es
+  moderada ($\sigma=0.067$, converge en $\approx$5\,258 evals) y la mediana es
+  competitiva con los AGs. En \textbf{syp\_500} ocurre lo contrario: \textbf{BL tiene
+  la caja más ancha de todos los algoritmos} ($\sigma=0.164$). La causa es estructural:
+  con $N=457$ el vecindario tiene $457\times456=208{.}392$ pares; con 10\,000
+  evaluaciones BL solo puede explorar el $4{,}8\%$ de una única pasada, parando siempre
+  por presupuesto ($\approx$9\,840 evals) y nunca por convergencia. El resultado depende
+  de qué fracción aleatoria del vecindario exploró cada semilla, produciendo alta
+  varianza. Los AGs tienen mucha menor varianza porque la población distribuye el
+  presupuesto de forma intrínsecamente más robusta.
 
-  \item \textbf{AM-All}: varianza visiblemente mayor que AM-Rand y AM-Best
-  (especialmente en syp\_100 y syp\_500), reflejando que el agotamiento prematuro del
-  presupuesto hace que el resultado dependa más de la semilla inicial.
+  \item \textbf{AGs}: varianza reducida y homogénea en todos los datasets. Las
+  diferencias entre variantes son visibles: \textbf{BLX tiene medianas superiores a
+  Aritmético} tanto en AGG como en AGE, confirmando la ventaja exploradora de BLX. En
+  ibex\_35 AGE-BLX supera ligeramente a AGG-BLX; en syp\_500 la diferencia
+  AGG-BLX\,$-$\,AGE-BLX es la más visible del gráfico ($\approx0{,}22$ de fitness),
+  mostrando que el esquema generacional escala mejor con $N$ grande.
 
-  \item \textbf{AM-Rand y AM-Best}: distribuciones con medianas superiores a todos los
-  AGs puros y a la BL, con varianza reducida. AM-Best tiene medianas ligeramente
-  superiores a AM-Rand, confirmando la eficiencia de aplicar BL a los mejores individuos.
+  \item \textbf{AM-All}: en ibex\_35 su caja es la más grande de los AMs con un
+  outlier hacia $-4{,}89$; en syp\_100 es incluso \textbf{peor en mediana que todos los
+  AGs puros} con varianza considerable. Esto refleja el agotamiento prematuro del
+  presupuesto: aplicar BL a los 100 individuos en la primera fase memetica (generación
+  10) consume $\approx$10\,000 evals de golpe, dejando sin presupuesto de evolución.
+  La alta varianza indica que el resultado queda muy ligado a la calidad de la población
+  en generación 10, que depende mucho de la semilla.
+
+  \item \textbf{AM-Rand y AM-Best}: en ibex\_35 sus cajas son \textbf{prácticamente
+  invisibles} ($\sigma\approx0{,}001$), con medianas claramente superiores a todos los
+  demás algoritmos incluida la BL. En syp\_100 y syp\_500 mantienen varianza baja y
+  medianas superiores. AM-Best tiene medianas ligeramente superiores a AM-Rand en todos
+  los datasets, confirmando que dirigir la BL a los mejores individuos es más eficiente
+  que aplicarla aleatoriamente.
 \end{itemize}
 
 \subsection{Capacidad de generalización (test 2025)}
@@ -875,33 +1012,131 @@ $1.00$ & $-2.790 \pm 0.041$ & $-3.894 \pm 0.082$ & $0.019$ \\
 \end{tabular}
 \end{table}
 
+\subsection{Boxplots del estudio}
+
+\begin{figure}[H]
+  \centering
+  \maybeimage{blx_alpha_ibex_35.png}{width=0.95\textwidth}{blx\_alpha\_ibex\_35.png}
+  \caption{Distribución del fitness (train y test 2025) por valor de $\alpha$ --- IBEX 35.}
+  \label{fig:alpha_ibex}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \maybeimage{blx_alpha_syp_100.png}{width=0.95\textwidth}{blx\_alpha\_syp\_100.png}
+  \caption{Distribución del fitness por $\alpha$ --- S\&P 100.}
+  \label{fig:alpha_syp100}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \maybeimage{blx_alpha_syp_500.png}{width=0.95\textwidth}{blx\_alpha\_syp\_500.png}
+  \caption{Distribución del fitness por $\alpha$ --- S\&P 500.}
+  \label{fig:alpha_syp500}
+\end{figure}
+
 \subsection{Análisis}
 
-\textbf{$\alpha = 0.5$ es óptimo en los tres datasets}, con la mejor fitness de
-entrenamiento en todos los casos. La curva de calidad tiene forma de \textbf{U invertida}:
-mejora monótonamente desde $\alpha = 0.0$ hasta $\alpha \approx 0.5$, y luego se degrada
-a $\alpha = 1.0$. Este comportamiento es consistente en los tres problemas.
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.88\textwidth,
+  height=6.5cm,
+  xlabel={Parámetro $\alpha$},
+  ylabel={Mejora de fitness respecto a $\alpha=0$ (\%)},
+  xtick={0, 0.1, 0.2, 0.3, 0.5, 0.7, 1.0},
+  xticklabels={$0.0$,$0.1$,$0.2$,$0.3$,$0.5$,$0.7$,$1.0$},
+  legend style={at={(0.02,0.98)}, anchor=north west, font=\small},
+  grid=major,
+  grid style={dashed, gray!40},
+  ymin=-1, ymax=12.5,
+  tick label style={font=\small},
+  label style={font=\small},
+]
 
-Un hallazgo contraintuitivo es que \textbf{$\sigma$ disminuye al aumentar $\alpha$} hasta
-el óptimo: más exploración conduce a resultados más consistentes, no más variables. La
-explicación es que $\alpha$ bajo produce convergencia prematura a diferentes óptimos
-locales (alta varianza), mientras que $\alpha$ adecuado permite escapar de dichos óptimos
-y converger hacia el mismo atractor global.
+% ibex_35 — mejora = (fitness(alpha) - fitness(0)) / |fitness(0)| * 100
+% base: -4.652
+\addplot[color=blue!80!black, mark=square*, thick, mark size=2.5pt] coordinates {
+  (0.0,  0.00)
+  (0.1,  0.43)
+  (0.2,  1.55)
+  (0.3,  2.73)
+  (0.5,  3.48)
+  (0.7,  3.48)
+  (1.0,  2.77)
+};
+\addlegendentry{IBEX 35 ($N=30$)}
 
-El caso más extremo es ibex\_35 con $\alpha \in \{0.5, 0.7\}$: $\sigma = 0.000$,
-prácticamente determinístico en las 50 semillas. Esto indica \textbf{convergencia
-prematura} a un único atractor: el espacio de soluciones pequeño ($N=30$, límites
-estrechos) combinado con alta exploración hace que todos los runs converjan al mismo
-punto. Si bien el valor encontrado es el mejor, la ausencia de diversidad puede ser
-problemática en paisajes de fitness más complejos.
+% syp_100 — base: -3.133
+\addplot[color=red!80!black, mark=triangle*, thick, mark size=2.5pt] coordinates {
+  (0.0,  0.00)
+  (0.1,  0.10)
+  (0.2,  1.08)
+  (0.3,  3.13)
+  (0.5,  9.54)
+  (0.7,  6.61)
+  (1.0,  2.20)
+};
+\addlegendentry{S\&P 100 ($N=97$)}
 
-El valor $\alpha = 0.3$ recomendado en el guion es subóptimo: $\alpha = 0.5$ mejora el
-fitness en aproximadamente un $7\%$ tanto en syp\_100 ($-3.035$ vs $-2.834$) como en
-syp\_500 ($-2.877$ vs $-2.682$).
+% syp_500 — base: -2.996
+\addplot[color=green!60!black, mark=*, thick, mark size=2.5pt] coordinates {
+  (0.0,  0.00)
+  (0.1,  0.43)
+  (0.2,  1.73)
+  (0.3,  3.97)
+  (0.5, 10.48)
+  (0.7,  8.64)
+  (1.0,  6.88)
+};
+\addlegendentry{S\&P 500 ($N=457$)}
 
-Finalmente, $\alpha = 0.0$ se comporta como el cruce Aritmético puro (sin extensión del
-intervalo), confirmando que la ventaja de BLX frente a Aritmético proviene exclusivamente
-de la capacidad de exploración más allá del convex hull de los padres.
+% Línea vertical en el óptimo alpha=0.5
+\draw[dashed, gray!70, thick] (axis cs:0.5,-1) -- (axis cs:0.5,12.5)
+  node[above, font=\scriptsize, gray!80!black] {óptimo};
+
+\end{axis}
+\end{tikzpicture}
+\caption{Mejora porcentual del fitness de entrenamiento respecto a $\alpha=0$ en función de $\alpha$, para los tres datasets. La línea discontinua marca el óptimo en $\alpha=0.5$.}
+\label{fig:blx_alpha_curve}
+\end{figure}
+
+La Figura~\ref{fig:blx_alpha_curve} muestra la mejora porcentual del fitness respecto
+a $\alpha=0$ en función de $\alpha$ para los tres datasets. La forma de \textbf{U
+invertida} es visible en los tres casos, aunque con perfiles distintos:
+
+\begin{itemize}
+  \item \textbf{IBEX 35 (azul, $N=30$)}: curva muy plana. La mejora máxima es solo del
+  $3{,}5\%$ y la curva hace plateau en $\alpha \in [0.5, 0.7]$ con apenas descenso en
+  $\alpha=1.0$. Con un espacio de soluciones pequeño ($N=30$), incluso $\alpha$ bajos
+  producen exploración suficiente; valores altos no degradan significativamente la calidad.
+
+  \item \textbf{S\&P 100 (rojo, $N=97$)}: U invertida más pronunciada y clásica. El
+  pico es del $9{,}5\%$ en $\alpha=0.5$ y la caída a $\alpha=1.0$ es muy marcada (solo
+  $2{,}2\%$ de mejora restante). Es el dataset donde la elección de $\alpha$ tiene mayor
+  impacto relativo.
+
+  \item \textbf{S\&P 500 (verde, $N=457$)}: pico más alto ($10{,}5\%$) pero la
+  bajada posterior es más suave ($6{,}9\%$ aún en $\alpha=1.0$). El gran espacio de
+  soluciones aguanta más exploración antes de que sea perjudicial; la zona óptima es
+  más ancha.
+\end{itemize}
+
+\textbf{$\alpha = 0.5$ es óptimo en los tres datasets}. El valor $\alpha = 0.3$
+recomendado en el guion es subóptimo: $\alpha = 0.5$ mejora el fitness en
+$\approx 7\%$ en syp\_100 ($-3.035$ vs $-2.834$) y syp\_500 ($-2.877$ vs $-2.682$).
+
+Un hallazgo contraintuitivo es que \textbf{$\sigma$ disminuye al aumentar $\alpha$}
+hasta el óptimo: más exploración produce resultados más consistentes entre semillas.
+Con $\alpha$ bajo la población converge a distintos óptimos locales según la semilla
+(alta varianza); con $\alpha$ adecuado escapa de esos óptimos y converge siempre
+hacia el mismo atractor. El caso extremo es ibex\_35 con $\alpha\in\{0.5, 0.7\}$:
+$\sigma=0.000$, prácticamente determinístico en las 50 semillas.
+
+Finalmente, $\alpha=0.0$ reproduce el comportamiento del cruce Aritmético (sin
+extensión del intervalo), confirmando que la ventaja de BLX proviene exclusivamente
+de la exploración más allá del convex hull de los padres.
 
 %-----------------------------------------------------------------------
 \end{document}

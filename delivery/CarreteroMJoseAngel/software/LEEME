@@ -29,8 +29,6 @@ boxplot.py
 LEEME
   Este fichero.
 
-README.md
-  Manual de usuario detallado.
 
 common/mh.h
   Interfaz genérica de metaheurística MH<tDomain>. No modificar.

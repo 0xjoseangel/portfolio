@@ -71,7 +71,7 @@ ResultMH<tDomain> LocalSearch<tDomain>::optimize(Problem<tDomain>& problem,
     }
   }
 
-  return {solucion_actual, static_cast<tFitness>(fitness_actual), static_cast<unsigned int>(evals)};
+  return {solucion_actual, fitness_actual, evals};
 }
 template <typename tDomain>
 ResultMH<tDomain> LocalSearch<tDomain>::optimize(
@@ -123,7 +123,7 @@ ResultMH<tDomain> LocalSearch<tDomain>::optimize(
     }
   }
 
-  return {solucion_actual, static_cast<tFitness>(fitness_actual), static_cast<unsigned int>(evals)};
+  return {solucion_actual, fitness_actual, evals};
 }
 
 template class LocalSearch<double>;
