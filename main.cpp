@@ -1,5 +1,7 @@
+#include <bmb.h>
 #include <genetic.h>
 #include <greedy.h>
+#include <ils.h>
 #include <localsearch.h>
 #include <portfolioProblem.h>
 #include <problem.h>
@@ -170,6 +172,8 @@ int main(int argc, char* argv[]) {
                                       TipoMemetico::RAND);
     AlgoritmoGenetico<double> am_best(TipoEsquema::GENERACIONAL, TipoCruce::BLX,
                                       TipoMemetico::BEST);
+    BMB<double> bmb;
+    ILS<double> ils;
 
     cout << "Ejecutando Random...";
     cout.flush();
@@ -221,12 +225,23 @@ int main(int argc, char* argv[]) {
     auto res_am_best = runAlgorithm(am_best, problem, seeds);
     cout << " OK\n";
 
+    cout << "Ejecutando BMB...";
+    cout.flush();
+    auto res_bmb = runAlgorithm(bmb, problem, seeds);
+    cout << " OK\n";
+
+    cout << "Ejecutando ILS...";
+    cout.flush();
+    auto res_ils = runAlgorithm(ils, problem, seeds);
+    cout << " OK\n";
+
     vector<pair<string, vector<RunResult>>> alg_results = {
         {"greedy", res_greedy},   {"random", res_rand},
         {"bl", res_ls},           {"AGG-Arit", res_agg_arit},
         {"AGG-BLX", res_agg_blx}, {"AGE-Arit", res_age_arit},
         {"AGE-BLX", res_age_blx}, {"AM-All", res_am_all},
         {"AM-Rand", res_am_rand}, {"AM-Best", res_am_best},
+        {"BMB", res_bmb},         {"ILS", res_ils},
     };
 
     printTable(ds.name, alg_results);
