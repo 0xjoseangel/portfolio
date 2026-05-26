@@ -1,45 +1,38 @@
 #include "ils.h"
 
 #include <algorithm>
+#include <numeric>
 
 template <typename tDomain>
 ILS<tDomain>::ILS(int it) : iteraciones(it) {}
 
-// Muta el 20% de los valores transfiriendo su peso a empresas inactivas
-// (representan un cluster distinto al de las empresas seleccionadas)
+// Muta el 20% de los elementos: selecciona 20% de posiciones,
+// desordenan sus valores y los reasigna
 template <typename tDomain>
 tSolution<tDomain> ILS<tDomain>::mutar(const tSolution<tDomain>& sol,
                                        Problem<tDomain>& problem) {
   int N = sol.size();
-  auto [lo, hi] = problem.getSolutionDomainRange();
-
-  std::vector<int> activas, inactivas;
-  for (int i = 0; i < N; i++) {
-    if (sol[i] > 0.0)
-      activas.push_back(i);
-    else
-      inactivas.push_back(i);
-  }
-
   int n_mut = std::max(1, (int)std::round(0.2 * N));
 
   auto mutada = sol;
 
-  Random::shuffle(activas);
-  int n_zerear = std::min(n_mut, (int)activas.size());
-  double peso_liberado = 0.0;
-  for (int i = 0; i < n_zerear; i++) {
-    peso_liberado += mutada[activas[i]];
-    mutada[activas[i]] = 0.0;
+  // Seleccionar n_mut índices aleatorios
+  std::vector<int> indices(N);
+  std::iota(indices.begin(), indices.end(), 0);
+  Random::shuffle(indices);
+
+  // Extraer valores de esas posiciones
+  std::vector<tDomain> valores_mut;
+  for (int i = 0; i < n_mut; i++) {
+    valores_mut.push_back(mutada[indices[i]]);
   }
 
-  // Redistribuir el peso entre empresas inactivas (cluster distinto)
-  if (!inactivas.empty() && peso_liberado > 0.0) {
-    Random::shuffle(inactivas);
-    int n_destinos = std::min(n_zerear, (int)inactivas.size());
-    double por_destino = peso_liberado / n_destinos;
-    for (int i = 0; i < n_destinos; i++)
-      mutada[inactivas[i]] = std::min(por_destino, hi);
+  // Desordenar esos valores
+  Random::shuffle(valores_mut);
+
+  // Reasignarlos a las mismas posiciones
+  for (int i = 0; i < n_mut; i++) {
+    mutada[indices[i]] = valores_mut[i];
   }
 
   problem.fix(mutada);

@@ -2,10 +2,12 @@
 #include <genetic.h>
 #include <greedy.h>
 #include <ils.h>
+#include <ils_es.h>
 #include <localsearch.h>
 #include <portfolioProblem.h>
 #include <problem.h>
 #include <randomSearch.h>
+#include <sa.h>
 
 #include <chrono>
 #include <cmath>
@@ -174,6 +176,8 @@ int main(int argc, char* argv[]) {
                                       TipoMemetico::BEST);
     BMB<double> bmb;
     ILS<double> ils;
+    SA<double> sa;
+    ILSES<double> ils_es;
 
     cout << "Ejecutando Random...";
     cout.flush();
@@ -235,6 +239,16 @@ int main(int argc, char* argv[]) {
     auto res_ils = runAlgorithm(ils, problem, seeds);
     cout << " OK\n";
 
+    cout << "Ejecutando SA...";
+    cout.flush();
+    auto res_sa = runAlgorithm(sa, problem, seeds);
+    cout << " OK\n";
+
+    cout << "Ejecutando ILS-ES...";
+    cout.flush();
+    auto res_ils_es = runAlgorithm(ils_es, problem, seeds);
+    cout << " OK\n";
+
     vector<pair<string, vector<RunResult>>> alg_results = {
         {"greedy", res_greedy},   {"random", res_rand},
         {"bl", res_ls},           {"AGG-Arit", res_agg_arit},
@@ -242,6 +256,7 @@ int main(int argc, char* argv[]) {
         {"AGE-BLX", res_age_blx}, {"AM-All", res_am_all},
         {"AM-Rand", res_am_rand}, {"AM-Best", res_am_best},
         {"BMB", res_bmb},         {"ILS", res_ils},
+        {"SA", res_sa},           {"ILS-ES", res_ils_es},
     };
 
     printTable(ds.name, alg_results);
