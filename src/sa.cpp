@@ -44,7 +44,7 @@ ResultMH<tDomain> SA<tDomain>::optimize(Problem<tDomain>& problem,
   int evals = 1;
 
   // Temperatura inicial y parámetros de enfriamiento
-  double T0 = (mu * fitness_actual) / (-log(phi));
+  double T0 = (mu * std::abs(fitness_actual)) / (-log(phi));
   int M = std::max(1, maxevals / max_vecinos);
   double beta = (T0 - Tf) / (M * T0 * Tf);
   double T = T0;
