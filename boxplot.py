@@ -6,14 +6,19 @@ import matplotlib.pyplot as plt
 import os
 
 ORDER = ["greedy", "random", "bl",
+         "Greedy", "Random", "BL",
          "AGG-Arit", "AGG-BLX",
          "AGE-Arit", "AGE-BLX",
-         "AM-All", "AM-Rand", "AM-Best"]
+         "AM-All", "AM-Rand", "AM-Best",
+         "BMB", "ILS", "SA", "ILS-ES"]
 
 DATASET_TITLES = {
-    "results_ibex_35":  "IBEX 35  (N=30)",
-    "results_syp_100":  "S&P 100  (N=97)",
-    "results_syp_500":  "S&P 500  (N=457)",
+    "results_ibex_35":    "IBEX 35  (N=30)",
+    "results_syp_100":    "S&P 100  (N=97)",
+    "results_syp_500":    "S&P 500  (N=457)",
+    "p3_results_ibex_35": "P3: IBEX 35  (N=30)",
+    "p3_results_syp_100": "P3: S&P 100  (N=97)",
+    "p3_results_syp_500": "P3: S&P 500  (N=457)",
 }
 
 ALPHA_TITLES = {

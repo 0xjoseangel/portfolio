@@ -6,7 +6,7 @@
 template <typename tDomain>
 class SA : public MH<tDomain> {
  public:
-  SA(double phi = 0.3, double mu = 0.2, double Tf = 1e-4,
+  SA(double phi = 0.3, double mu = 0.2, double Tf = 1e-3,
      int k_vecinos = 10, int k_exitos = 1);
   ~SA() override = default;
 

@@ -1,0 +1,1024 @@
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[spanish]{babel}
+\usepackage[utf8]{inputenc}
+\usepackage[T1]{fontenc}
+\usepackage{geometry}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{booktabs}
+\usepackage[ruled,vlined,linesnumbered]{algorithm2e}
+\usepackage[hidelinks]{hyperref}
+\usepackage{float}
+\usepackage{graphicx}
+\usepackage{tikz}
+\usetikzlibrary{shapes.geometric, arrows.meta, positioning, fit, backgrounds, calc}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\newcommand{\maybeimage}[3]{%
+  \IfFileExists{#1}{\includegraphics[#2]{#1}}%
+  {\fbox{\parbox{0.7\textwidth}{\centering\vspace{1cm}[Figura pendiente: #3]\vspace{1cm}}}}%
+}
+\usepackage{caption}
+\usepackage{parskip}
+\usepackage{setspace}
+\usepackage{titlesec}
+\usepackage{xcolor}
+\usepackage{array}
+\usepackage{multirow}
+
+\geometry{top=2.5cm, bottom=2.5cm, left=2.5cm, right=2.5cm}
+\setlength{\parskip}{6pt}
+
+\titlespacing*{\section}{0pt}{14pt}{6pt}
+\titlespacing*{\subsection}{0pt}{10pt}{4pt}
+
+% Colores de la Práctica 2 (mantenidos para coherencia visual)
+\definecolor{colPop}{RGB}{52,101,164}
+\definecolor{colSel}{RGB}{180,140,40}
+\definecolor{colCross}{RGB}{39,126,77}
+\definecolor{colMut}{RGB}{150,50,150}
+\definecolor{colBL}{RGB}{200,50,50}
+\definecolor{lightPop}{RGB}{225,235,255}
+\definecolor{lightSel}{RGB}{255,245,210}
+\definecolor{lightCross}{RGB}{220,245,230}
+\definecolor{lightMut}{RGB}{245,230,255}
+\definecolor{lightBL}{RGB}{255,220,220}
+
+% Colores nuevos para algoritmos de trayectoria (Práctica 3)
+\definecolor{colSA}{RGB}{200,100,30}
+\definecolor{lightSA}{RGB}{255,235,210}
+\definecolor{colIter}{RGB}{30,140,180}
+\definecolor{lightIter}{RGB}{210,245,255}
+
+\newcommand{\placeholder}[0]{\textit{---}}
+
+% Palabras clave de algorithm2e en español
+\SetKwInput{KwIn}{Entrada}
+\SetKwInput{KwOut}{Salida}
+\SetKw{KwReturn}{devolver}
+\SetKwFor{Para}{para}{hacer}{fin para}
+\SetKwFor{Mientras}{mientras}{hacer}{fin mientras}
+\SetKwIF{Si}{SiNo}{OSiNo}{si}{entonces}{si no si}{si no}{fin si}
+\SetKwFunction{fitness}{fitness}
+\SetKwFunction{fix}{fix}
+\SetKwFunction{createSolution}{crearSolución}
+\SetKwFunction{BL}{BL}
+\SetKwFunction{SA}{SA}
+\SetKwFunction{mutar}{mutar20\%}
+\SetKwFunction{vecino}{generarVecino}
+
+%-----------------------------------------------------------------------
+\begin{document}
+
+%-----------------------------------------------------------------------
+\begin{titlepage}
+  \centering
+  \vspace*{2cm}
+  {\Large \textbf{Universidad de Granada}\\[0.3cm]
+          \textbf{ETSIIT Informática y Telecomunicación}\\[0.3cm]
+          Dpto.\ de Ciencias de la Computación e Inteligencia Artificial}
+  \vspace{2.5cm}
+
+  {\LARGE \textbf{Metaheurísticas}}\\[0.5cm]
+  {\Large Práctica 3}\\[0.3cm]
+  {\large Técnicas de Búsqueda por Trayectorias\\
+           para el Problema de Portfolio}
+
+  \vspace{1.5cm}
+  {\large Curso 2025--2026}
+
+  \vfill
+  \begin{tabular}{rl}
+    \textbf{Nombre:}  & Jose Angel Carretero Montes \\[4pt]
+    \textbf{DNI:}     & 25628892S \\[4pt]
+    \textbf{Email:}   & \texttt{joseangel1@correo.ugr.es} \\[4pt]
+    \textbf{Grupo:}   & Grupo 3 \\[4pt]
+    \textbf{Horario:} & Martes 15:30--17:30 \\
+  \end{tabular}
+  \vspace{1.5cm}
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+%-----------------------------------------------------------------------
+\section{Descripción del Problema}
+%-----------------------------------------------------------------------
+
+El \textbf{Problema de Portfolio} consiste en determinar la asignación óptima de capital
+entre $N$ activos financieros con el objetivo de maximizar el retorno esperado
+minimizando simultáneamente el riesgo.
+
+\subsection*{Representación de los datos}
+
+Para cada activo $i \in \{1,\ldots,N\}$ y día $t \in \{1,\ldots,T\}$ se dispone
+del retorno diario $\mu_{ti}$, calculado como:
+\[
+  \mu_{ti} = \frac{V_{ti} - V_{(t+1)i}}{V_{ti}}
+\]
+Los datos cubren el periodo 2015--2024 para entrenamiento y el año 2025 para evaluación.
+
+\subsection*{Función objetivo}
+
+Dado un vector de pesos $w = (w_1,\ldots,w_N)$:
+\[
+  \text{fitness}(w) = \text{Beneficio}(w) - \lambda \cdot \text{Riesgo}(w)
+\]
+\[
+  \text{Beneficio}(w) = \sum_{i=1}^{N} w_i \cdot \sum_{t=1}^{T}\log(1+\mu_{ti})
+  \qquad
+  \text{Riesgo}(w) = \sqrt{\sum_{i=1}^{N}\sum_{j=1}^{N} w_i \cdot \Sigma_{ij} \cdot w_j}
+\]
+siendo $\Sigma_{ij}$ la covarianza entre activos $i$ y $j$, y $\lambda = 500$.
+
+\begin{algorithm}[H]
+\caption{Cálculo de fitness$(w)$}
+\KwIn{pesos $w$, beneficio por activo \textit{benefit\_factor}[], matriz de covarianzas \textit{cov}[][], $\lambda$}
+\KwOut{valor de fitness}
+$benefit \leftarrow 0$\;
+\Para{$i \leftarrow 1$ \KwTo $N$}{
+  $benefit \leftarrow benefit + w[i] \cdot \textit{benefit\_factor}[i]$\;
+}
+$risk\_sq \leftarrow 0$\;
+\Para{$i \leftarrow 1$ \KwTo $N$}{
+  \Para{$j \leftarrow 1$ \KwTo $N$}{
+    $risk\_sq \leftarrow risk\_sq + w[i] \cdot \textit{cov}[i][j] \cdot w[j]$\;
+  }
+}
+\KwReturn{$benefit - \lambda \cdot \sqrt{risk\_sq}$}
+\end{algorithm}
+
+\subsection*{Restricciones}
+
+\[
+  \sum_{i=1}^{N} w_i = 1 \qquad
+  w_i = 0 \;\vee\; lo \le w_i \le hi \quad \forall i
+\]
+
+%-----------------------------------------------------------------------
+\section{Componentes Comunes a los Algoritmos de Trayectoria}
+%-----------------------------------------------------------------------
+
+\subsection{Representación de soluciones y operador de reparación}
+
+Una solución es un vector $w \in \mathbb{R}^N$ donde $w_i \in \{0\} \cup [lo_i, hi_i]$ indica
+la fracción de capital invertida en el activo $i$.
+La función \texttt{fix()} garantiza la factibilidad tras cualquier modificación:
+normaliza los pesos para que sumen 1, recorta a $[lo, hi]$ y redistribuye iterativamente.
+
+\subsection{Operador de vecindad (usado en SA)}
+
+El operador de vecino de SA modifica \textbf{una única posición} del vector de pesos: se
+elige aleatoriamente una posición $pos$ y se le asigna un valor nuevo $w_{pos} \sim U(lo, hi)$.
+A continuación se aplica \texttt{fix()} para restaurar la factibilidad.
+
+\begin{algorithm}[H]
+\caption{generarVecino($sol$, problema)}
+\KwIn{solución $sol$, $[lo,hi]$}
+\KwOut{solución vecina}
+$pos \leftarrow$ aleatorio en $[0, N-1]$\;
+$sol' \leftarrow sol$\;
+$sol'[pos] \leftarrow$ aleatorio en $[lo, hi]$\;
+\fix{$sol'$}\;
+\KwReturn{$sol'$}
+\end{algorithm}
+
+\subsection{Operador de mutación del 20\% (usado en ILS e ILS-ES)}
+
+El operador de mutación selecciona $n_{mut} = \max(1,\lfloor 0{,}2\cdot N\rfloor)$ posiciones
+al azar, extrae sus valores, los baraja y los reasigna a las mismas posiciones.
+Finalmente aplica \texttt{fix()}. Este operador produce una perturbación más drástica que
+un único cambio de gen, escapando de cuencas de atracción locales.
+
+\begin{algorithm}[H]
+\caption{mutar20\%($sol$, problema)}
+\KwIn{solución $sol$, $[lo,hi]$}
+\KwOut{solución mutada}
+$n_{mut} \leftarrow \max(1, \lfloor 0{,}2 \cdot N \rfloor)$\;
+Barajar índices $[0,N-1]$ aleatoriamente $\to indices$\;
+$valores \leftarrow [sol[indices[0]], \ldots, sol[indices[n_{mut}-1]]]$\;
+Barajar $valores$ aleatoriamente\;
+\Para{$i \leftarrow 0$ \KwTo $n_{mut}-1$}{
+  $sol'[indices[i]] \leftarrow valores[i]$\;
+}
+\fix{$sol'$}\;
+\KwReturn{$sol'$}
+\end{algorithm}
+
+\subsection{Búsqueda Local (BL) como subrutina}
+
+Los algoritmos BMB, ILS e ILS-ES usan la BL de la Práctica~1 como subrutina interna:
+operador de intercambio con proporción $p=0{,}4$, primer-mejor, y llamada a \texttt{fix()}
+en cada candidato. La BL termina cuando no hay mejora en toda una pasada aleatoria del
+vecindario, o cuando se agota el presupuesto de evaluaciones.
+
+\begin{algorithm}[H]
+\caption{BL($sol\_inicial$, problema, maxEvals)}
+\KwIn{solución inicial, problema, maxEvals}
+\KwOut{solución, fitness, evaluaciones}
+$Pares \leftarrow \{(i,j): i\ne j\}$;\quad $sol \leftarrow sol\_inicial$\;
+$fit \leftarrow$ evaluar($sol$);\quad $mejora \leftarrow$ verdadero;\quad $evals \leftarrow 1$\;
+\Mientras{$mejora$ \textbf{y} $evals < \text{maxEvals}$}{
+  $mejora \leftarrow$ falso;\quad Barajar $Pares$\;
+  \Para{$(ori,dst)$ en $Pares$ \textbf{y} $evals < \text{maxEvals}$}{
+    Generar vecino por transferencia de $p \cdot sol[ori]$ de $ori$ a $dst$\;
+    $evals \leftarrow evals + 1$\;
+    \Si{$fit' > fit$}{$sol \leftarrow sol'$;\; $fit \leftarrow fit'$;\; $mejora \leftarrow$ verdadero;\; \textbf{salir}\;}
+  }
+}
+\KwReturn{$sol$, $fit$, $evals$}
+\end{algorithm}
+
+%-----------------------------------------------------------------------
+\section{Algoritmos de Búsqueda por Trayectorias}
+%-----------------------------------------------------------------------
+
+\subsection{Enfriamiento Simulado (SA)}
+
+\subsubsection*{Parámetros}
+
+\begin{center}
+\begin{tabular}{lll}
+\toprule
+\textbf{Parámetro} & \textbf{Valor} & \textbf{Significado} \\
+\midrule
+$\varphi$ & $0{,}3$ & Prob.\ de aceptar un vecino $\mu$ peor que la solución inicial \\
+$\mu$     & $0{,}2$ & Fracción de degradación aceptable para calcular $T_0$ \\
+$T_f$     & $10^{-3}$ & Temperatura final \\
+$k_{vec}$ & $10$ & Factor: $\text{max\_vecinos} = k_{vec} \cdot N$ \\
+$k_{exit}$& $1$ & Factor: $\text{max\_éxitos} = k_{exit} \cdot N$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\subsubsection*{Temperatura inicial y parámetros de enfriamiento}
+
+La temperatura inicial $T_0$ se calibra para que, con la solución aleatoria inicial $s_0$,
+la probabilidad de aceptar un vecino $\mu$-peor sea $\varphi$:
+\[
+  T_0 = \frac{\mu \cdot |\text{fitness}(s_0)|}{-\ln(\varphi)}
+\]
+El número de iteraciones de enfriamiento es $M = \max\!\left(1,\left\lfloor \frac{\text{maxEvals}}{\text{max\_vecinos}} \right\rfloor\right)$,
+y el coeficiente de Cauchy modificado:
+\[
+  \beta = \frac{T_0 - T_f}{M \cdot T_0 \cdot T_f}
+\]
+de modo que $T_{k+1} = \dfrac{T_k}{1 + \beta \cdot T_k}$.
+
+\subsubsection*{Pseudocódigo}
+
+\begin{algorithm}[H]
+\caption{SA (Enfriamiento Simulado)}
+\KwIn{problema, maxEvals} \KwOut{mejor solución}
+$sol \leftarrow$ \createSolution{};\quad $fit \leftarrow$ evaluar($sol$);\quad $mejor \leftarrow sol$\;
+$T_0 \leftarrow (\mu \cdot |fit|) / (-\ln\varphi)$;\quad
+$M \leftarrow \max(1, \lfloor \text{maxEvals} / (k_{vec}\cdot N) \rfloor)$\;
+$\beta \leftarrow (T_0 - T_f) / (M \cdot T_0 \cdot T_f)$;\quad $T \leftarrow T_0$;\quad $evals \leftarrow 1$\;
+\Para{$enfr \leftarrow 1$ \KwTo $M$ \textbf{y} $evals < \text{maxEvals}$}{
+  $n\_vec \leftarrow 0$;\quad $n\_exit \leftarrow 0$\;
+  \Mientras{$n\_vec < k_{vec}\cdot N$ \textbf{y} $n\_exit < k_{exit}\cdot N$ \textbf{y} $evals < \text{maxEvals}$}{
+    $sol' \leftarrow$ \vecino{$sol$, problema};\quad $fit' \leftarrow$ evaluar($sol'$);\quad $evals\mathrel{+}=1$\;
+    $\Delta \leftarrow fit' - fit$\;
+    \Si{$\Delta > 0$ \textbf{o} $U(0,1) < e^{\Delta/T}$}{
+      $sol \leftarrow sol'$;\quad $fit \leftarrow fit'$;\quad $n\_exit\mathrel{+}=1$\;
+      \Si{$fit > fit(mejor)$}{$mejor \leftarrow sol$\;}
+    }
+    $n\_vec\mathrel{+}=1$\;
+  }
+  \Si{$n\_exit = 0$}{\textbf{terminar}\;}
+  $T \leftarrow T / (1 + \beta \cdot T)$\;
+  \Si{$T < T_f$}{\textbf{terminar}\;}
+}
+\KwReturn{$mejor$}
+\end{algorithm}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[
+  node distance=0.35cm and 0.7cm,
+  blk/.style={rectangle, rounded corners=4pt, minimum width=2.1cm, minimum height=0.8cm,
+              text centered, text width=2.1cm, font=\scriptsize\bfseries, thick},
+  arr/.style={-{Stealth[length=2.5mm]}, thick}
+]
+\node[blk, fill=lightIter, draw=colIter] (init) {Inicializar \\ $sol$, $T_0$, $\beta$, $M$};
+\node[blk, fill=lightSA, draw=colSA, right=of init] (outer) {Bucle externo \\ $enfr = 1\ldots M$};
+\node[blk, fill=lightSA, draw=colSA, right=of outer] (inner) {Bucle interno \\ Metropolis};
+\node[blk, fill=lightMut, draw=colMut, right=of inner] (cool) {Enfriar \\ $T \leftarrow T/(1{+}\beta T)$};
+\node[blk, fill=lightBL, draw=colBL, below=1.4cm of inner] (stop) {¿Parar? \\ $n\_exit=0$ \\ $T < T_f$};
+\node[blk, fill=lightIter, draw=colIter, right=of cool] (best) {Devolver \\ $mejor$};
+
+\draw[arr] (init)--(outer);
+\draw[arr] (outer)--(inner);
+\draw[arr] (inner)--(cool);
+\draw[arr] (cool)--(best);
+\draw[arr] (inner.south) -- (stop.north);
+\draw[arr,dashed] (stop.west) -- node[below,font=\tiny]{s\'{i} $\to$ parar} ++(-1.1,0) |- (best.south);
+\draw[arr, rounded corners=5pt] (cool.south) -- ++(0,-0.55) -- ++(-4.55,0) -- (outer.south);
+\end{tikzpicture}
+\caption{Estructura de SA. El bucle externo controla el enfriamiento; el interno genera y acepta vecinos mediante el criterio de Metropolis.}
+\label{fig:sa_flow}
+\end{figure}
+
+\subsection{Búsqueda Multiarranque Básica (BMB)}
+
+BMB ejecuta $n_{iter}=5$ arranques independientes: cada uno genera una solución aleatoria
+y la refina con BL hasta un máximo de $2\,000$ evaluaciones. Al final devuelve la mejor
+de las 5 soluciones encontradas.
+
+\begin{algorithm}[H]
+\caption{BMB (Búsqueda Multiarranque Básica)}
+\KwIn{problema, maxEvals} \KwOut{mejor solución}
+$mejor \leftarrow -\infty$;\quad $evals \leftarrow 0$\;
+\Para{$i \leftarrow 1$ \KwTo $n_{iter}=5$}{
+  \Si{$evals \geq \text{maxEvals}$}{\textbf{salir}\;}
+  $budget \leftarrow \min(2000,\;\text{maxEvals} - evals)$\;
+  $sol \leftarrow$ \createSolution{}\;
+  $res \leftarrow$ \BL{$sol$, problema, $budget$}\;
+  $evals \leftarrow evals + res.evals$\;
+  \Si{$res.fitness > mejor.fitness$}{$mejor \leftarrow res$\;}
+}
+\KwReturn{$mejor$}
+\end{algorithm}
+
+\subsection{Búsqueda Local Reiterada (ILS)}
+
+ILS aplica BL 5 veces: la primera sobre una solución aleatoria y las 4 restantes sobre
+mutaciones (20\% de posiciones barajadas) de la \textbf{mejor solución encontrada} hasta
+ese momento (criterio \textit{best}). Cada BL tiene un presupuesto de $2\,000$ evaluaciones.
+
+\begin{algorithm}[H]
+\caption{ILS (Búsqueda Local Reiterada)}
+\KwIn{problema, maxEvals} \KwOut{mejor solución}
+$mejor \leftarrow$ \BL{\createSolution{}, problema, $2000$}\;
+$evals \leftarrow mejor.evals$\;
+\Para{$i \leftarrow 1$ \KwTo $n_{iter}-1 = 4$}{
+  $sol' \leftarrow$ \mutar{$mejor.sol$, problema}\;
+  $res \leftarrow$ \BL{$sol'$, problema, $2000$}\;
+  $evals \leftarrow evals + res.evals$\;
+  \Si{$res.fitness > mejor.fitness$}{$mejor \leftarrow res$\;}
+}
+\KwReturn{$mejor$}
+\end{algorithm}
+
+\subsection{ILS con Enfriamiento Simulado (ILS-ES)}
+
+ILS-ES sustituye la BL de ILS por SA como mecanismo de búsqueda local.
+El presupuesto total se divide en partes iguales: cada SA recibe
+$\lfloor \text{maxEvals}/5 \rfloor$ evaluaciones. El mismo operador de mutación del 20\%
+genera la perturbación entre iteraciones.
+
+\begin{algorithm}[H]
+\caption{ILS-ES (ILS con Enfriamiento Simulado como subalgoritmo)}
+\KwIn{problema, maxEvals} \KwOut{mejor solución}
+$budget \leftarrow \lfloor \text{maxEvals} / n_{iter} \rfloor$;\quad $evals \leftarrow 0$\;
+$mejor \leftarrow$ \SA{\createSolution{}, problema, $budget$};\quad $evals \leftarrow mejor.evals$\;
+\Para{$i \leftarrow 1$ \KwTo $n_{iter}-1 = 4$}{
+  $sol' \leftarrow$ \mutar{$mejor.sol$, problema}\;
+  $res \leftarrow$ \SA{$sol'$, problema, $budget$}\;
+  $evals \leftarrow evals + res.evals$\;
+  \Si{$res.fitness > mejor.fitness$}{$mejor \leftarrow res$\;}
+}
+\KwReturn{$mejor$}
+\end{algorithm}
+
+%-----------------------------------------------------------------------
+\section{Estructura del Código y Manual de Usuario}
+%-----------------------------------------------------------------------
+
+\begin{verbatim}
+portfolio/
+  main.cpp              -- Comparativa P1+P2 (14 algoritmos)
+  main_p3.cpp           -- Comparativa P3 (8 algoritmos)
+  main_sa_params.cpp    -- Estudio parametros SA (vol.)
+  main_blx_alpha.cpp    -- Estudio alpha BLX (Practica 2)
+  CMakeLists.txt      -- Targets: main, main_p3, study_sa_params
+  boxplot.py          -- Genera boxplots PNG desde los CSV
+  data/
+    ibex_35.csv, syp_100.csv, syp_500.csv
+  src/
+    portfolioProblem.cpp -- fitness, fix, createSolution
+    sa.cpp  bmb.cpp  ils.cpp  ils_es.cpp
+    localsearch.cpp  genetic.cpp  greedy.cpp
+  inc/
+    sa.h  bmb.h  ils.h  ils_es.h  localsearch.h
+  common/
+    mh.h  problem.h  solution.h  random.hpp
+\end{verbatim}
+
+\textbf{Compilación y ejecución:}
+\begin{verbatim}
+cmake -S . -B build && cmake --build build -j$(nproc)
+
+# Comparativa P3 (50 semillas, 10000 evals)
+./build/main_p3 10000 50
+
+# Estudio parametros SA (trabajo voluntario)
+./build/study_sa_params 10000 50
+
+# Generar boxplots (requiere matplotlib, seaborn, pandas)
+python3 boxplot.py
+\end{verbatim}
+
+Los CSVs generados son: \texttt{p3\_results\_*.csv} (boxplots),
+\texttt{p3\_stats\_*.csv} (estadísticas para tablas),
+\texttt{sa\_phi\_*.csv} y \texttt{sa\_kvecinos\_*.csv} (trabajo voluntario).
+
+%-----------------------------------------------------------------------
+\section{Experimentos y Resultados}
+\label{sec:experimentos}
+%-----------------------------------------------------------------------
+
+\subsection{Casos del problema}
+
+\begin{center}
+\begin{tabular}{lrrrl}
+\toprule
+\textbf{Fichero} & \textbf{N} & \textbf{Días train} & \textbf{Días test} & \textbf{$[lo, hi]$} \\
+\midrule
+\texttt{ibex\_35.csv}  & 30  & 2559 & 254 & $[0.005,\;0.08]$ \\
+\texttt{syp\_100.csv}  & 97  & 2516 & 249 & $[0.005,\;0.05]$ \\
+\texttt{syp\_500.csv}  & 457 & 2516 & 249 & $[0.005,\;0.02]$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Parámetros comunes: $\lambda=500$, MAX\_EVALS$=10\,000$, semillas $1$--$50$.
+Los algoritmos de referencia son Greedy y Random (P1 sin optimización), BL (P1,
+operador de intercambio) y AM-Best (P2, mejor algoritmo).
+
+\subsection{Resultados}
+
+\begin{table}[H]
+\centering\footnotesize
+\caption{IBEX 35 --- $N=30$, $[lo,hi]=[0.005,0.08]$ (medias $\pm\sigma$, 50 semillas)}
+\begin{tabular}{lrrrrrr r}
+\toprule
+\textbf{Algoritmo} & \textbf{Fit.Train} & $\pm\sigma$ & \textbf{Fit.2025} & $\pm\sigma$ & \textbf{Ben.2025} & \textbf{Evals} & \textbf{Tiempo (s)} \\
+\midrule
+\multicolumn{8}{l}{\textit{--- Referencias (P1 y P2) ---}} \\
+\textbf{Greedy}   & $-4.650$ & $0.000$ & $-3.387$ & $0.000$ & $0.115$ & $1.0$      & $0.000$ \\
+\textbf{Random}   & $-4.941$ & $0.070$ & $-3.306$ & $0.104$ & $0.036$ & $10000.0$  & $0.026$ \\
+\textbf{BL}       & $-4.573$ & $0.019$ & $-3.109$ & $0.008$ & $0.022$ & $1257.0$   & $0.001$ \\
+\multicolumn{8}{l}{\textit{--- Mejor P2 ---}} \\
+\textbf{AM-Best}  & $\mathbf{-4.491}$ & $0.001$ & $\mathbf{-3.084}$ & $0.003$ & $0.033$ & $10000.4$  & $0.011$ \\
+\multicolumn{8}{l}{\textit{--- P3 nuevos ---}} \\
+\textbf{BMB}      & $-4.546$ & $0.014$ & $-3.102$ & $0.008$ & $0.023$ & $6041.3$   & $0.004$ \\
+\textbf{ILS}      & $-4.535$ & $0.037$ & $-3.096$ & $0.014$ & $0.026$ & $5070.2$   & $0.003$ \\
+\textbf{SA}       & $-4.605$ & $0.036$ & $-3.144$ & $0.042$ & $0.034$ & $2841.9$   & $0.001$ \\
+\textbf{ILS-ES}   & $-4.595$ & $0.031$ & $-3.143$ & $0.040$ & $0.034$ & $8160.0$   & $0.003$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering\footnotesize
+\caption{S\&P 100 --- $N=97$, $[lo,hi]=[0.005,0.05]$ (medias $\pm\sigma$, 50 semillas)}
+\begin{tabular}{lrrrrrr r}
+\toprule
+\textbf{Algoritmo} & \textbf{Fit.Train} & $\pm\sigma$ & \textbf{Fit.2025} & $\pm\sigma$ & \textbf{Ben.2025} & \textbf{Evals} & \textbf{Tiempo (s)} \\
+\midrule
+\multicolumn{8}{l}{\textit{--- Referencias (P1 y P2) ---}} \\
+\textbf{Greedy}   & $-3.664$ & $0.000$ & $-5.020$ & $0.000$ & $0.010$ & $1.0$      & $0.000$ \\
+\textbf{Random}   & $-3.390$ & $0.055$ & $-4.113$ & $0.193$ & $0.080$ & $10000.0$  & $0.059$ \\
+\textbf{BL}       & $-3.032$ & $0.067$ & $-3.870$ & $0.033$ & $0.097$ & $5258.5$   & $0.027$ \\
+\multicolumn{8}{l}{\textit{--- Mejor P2 ---}} \\
+\textbf{AM-Best}  & $-2.912$ & $0.025$ & $-3.725$ & $0.033$ & $0.094$ & $10000.5$  & $0.120$ \\
+\multicolumn{8}{l}{\textit{--- P3 nuevos ---}} \\
+\textbf{BMB}      & $-2.957$ & $0.041$ & $-3.845$ & $0.028$ & $0.094$ & $10000.0$  & $0.091$ \\
+\textbf{ILS}      & $-2.983$ & $0.098$ & $-3.851$ & $0.046$ & $0.096$ & $10000.0$  & $0.053$ \\
+\textbf{SA}       & $\mathbf{-2.870}$ & $0.015$ & $\mathbf{-3.780}$ & $0.026$ & $0.096$ & $9091.0$   & $0.015$ \\
+\textbf{ILS-ES}   & $-2.885$ & $0.011$ & $-3.786$ & $0.022$ & $\mathbf{0.098}$ & $9172.6$   & $0.015$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering\footnotesize
+\caption{S\&P 500 --- $N=457$, $[lo,hi]=[0.005,0.02]$ (medias $\pm\sigma$, 50 semillas)}
+\begin{tabular}{lrrrrrr r}
+\toprule
+\textbf{Algoritmo} & \textbf{Fit.Train} & $\pm\sigma$ & \textbf{Fit.2025} & $\pm\sigma$ & \textbf{Ben.2025} & \textbf{Evals} & \textbf{Tiempo (s)} \\
+\midrule
+\multicolumn{8}{l}{\textit{--- Referencias (P1 y P2) ---}} \\
+\textbf{Greedy}   & $-3.438$ & $0.000$ & $-5.205$ & $0.000$ & $-0.063$ & $1.0$      & $0.000$ \\
+\textbf{Random}   & $-3.642$ & $0.042$ & $-4.430$ & $0.167$ & $0.012$  & $10000.0$  & $1.300$ \\
+\textbf{BL}       & $-3.318$ & $0.164$ & $-4.228$ & $0.119$ & $0.008$  & $9839.7$   & $0.679$ \\
+\multicolumn{8}{l}{\textit{--- Mejor P2 ---}} \\
+\textbf{AM-Best}  & $-2.811$ & $0.031$ & $-3.907$ & $0.065$ & $0.017$  & $10000.4$  & $1.702$ \\
+\multicolumn{8}{l}{\textit{--- P3 nuevos ---}} \\
+\textbf{BMB}      & $-3.195$ & $0.072$ & $-4.127$ & $0.062$ & $0.011$  & $10000.0$  & $1.747$ \\
+\textbf{ILS}      & $-2.819$ & $0.095$ & $-4.004$ & $0.054$ & $0.015$  & $10000.0$  & $1.192$ \\
+\textbf{SA}       & $\mathbf{-2.627}$ & $0.009$ & $-3.917$ & $0.029$ & $0.022$  & $9140.9$   & $0.313$ \\
+\textbf{ILS-ES}   & $-2.709$ & $0.016$ & $\mathbf{-3.895}$ & $0.035$ & $\mathbf{0.022}$  & $10000.0$  & $0.326$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\subsection{Boxplots}
+
+\begin{figure}[H]
+  \centering
+  \maybeimage{p3_results_ibex_35.png}{width=0.95\textwidth}{p3\_results\_ibex\_35.png}
+  \caption{Distribución del fitness de entrenamiento (2015--2024) en IBEX 35 para los 8 algoritmos.}
+  \label{fig:box_ibex}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \maybeimage{p3_results_syp_100.png}{width=0.95\textwidth}{p3\_results\_syp\_100.png}
+  \caption{Distribución del fitness de entrenamiento en S\&P 100.}
+  \label{fig:box_syp100}
+\end{figure}
+
+\begin{figure}[H]
+  \centering
+  \maybeimage{p3_results_syp_500.png}{width=0.95\textwidth}{p3\_results\_syp\_500.png}
+  \caption{Distribución del fitness de entrenamiento en S\&P 500.}
+  \label{fig:box_syp500}
+\end{figure}
+
+%-----------------------------------------------------------------------
+\section{Análisis de Resultados}
+%-----------------------------------------------------------------------
+
+\subsection{Comportamiento de SA: escala con $N$ y eficiencia}
+
+SA es el \textbf{algoritmo más eficaz en syp\_100 y syp\_500}.
+En syp\_500 obtiene un fitness medio de $-2{,}627$ con $\sigma=0{,}009$ —
+la \textbf{menor varianza de todos los algoritmos en ese dataset} —, superando incluso
+al mejor algoritmo de la Práctica~2 (AM-Best: $-2{,}811$) con solo un 3\% del tiempo de
+ejecución ($0{,}313$\,s vs $1{,}702$\,s).
+
+La causa es la naturaleza del operador de vecindad: un único cambio de gen produce
+candidatos de baja coste computacional ($O(N)$ en la evaluación incremental), permitiendo
+explorar miles de vecinos dentro del presupuesto. En cambio, BL necesita revisar
+$N(N-1)=208\,392$ pares por pasada, agotando el presupuesto sin llegar a convergencia.
+
+SA usa en media $9\,141$ evaluaciones, no las $10\,000$ disponibles: el criterio de parada
+anticipada (\textit{num\_éxitos}$=0$ en un enfriamiento) indica que la temperatura ha
+descendido al punto en que el algoritmo ya no encuentra vecinos mejorantes ni los acepta
+por probabilidad, señal de convergencia real.
+
+En \textbf{ibex\_35} ($N=30$), SA obtiene solo $-4{,}605$, siendo el peor de los P3 por
+detrás de BMB e ILS. El problema es la calibración del $\beta$: con $N=30$,
+max\_vec$=300$, $M=33$ enfriamientos, $T_0$ muy cercano a cero (fitness $\approx -4{,}6$),
+la temperatura desciende rápidamente y el algoritmo converge antes de explorar suficiente.
+
+\subsection{Comportamiento de BMB: impacto del tamaño del vecindario}
+
+BMB funciona bien en problemas pequeños: en ibex\_35 obtiene $-4{,}546$, comparable a
+ILS ($-4{,}535$). Sin embargo, \textbf{fracasa dramáticamente en syp\_500}: $-3{,}195$,
+peor incluso que la BL simple ($-3{,}318$ ya es malo, pero BMB es aún peor).
+
+La razón es directa: BMB aplica BL con presupuesto fijo de $2\,000$ evaluaciones por
+arranque. En syp\_500 ($N=457$), una pasada completa del vecindario requiere
+$457 \times 456 = 208\,392$ evaluaciones, por lo que con $2\,000$ evals la BL solo explora
+el $1\%$ del vecindario y para siempre por límite de presupuesto, sin llegar jamás a
+convergencia. Los 5 arranques son 5 BLs sin converger, y la ``mejor de 5'' no mejora
+sustancialmente sobre una sola BL sin converger.
+
+La varianza de BMB en syp\_500 ($\sigma=0{,}072$) es moderada: los 5 arranques aleatorios
+cubren distintas regiones pero ninguna llega a explotarse correctamente.
+
+\subsection{Comportamiento de ILS: perturbación vs reinicio}
+
+ILS supera a BMB en todos los datasets, pero la diferencia es especialmente marcada en
+syp\_500: ILS obtiene $-2{,}819$ frente a $-3{,}195$ de BMB.
+
+La clave es el \textbf{operador de mutación del 20\%}: en lugar de reiniciar desde un
+punto aleatorio (BMB), ILS parte de la mejor solución actual y la perturba manteniendo
+$N - 0{,}2N = 0{,}8N$ posiciones intactas. Esto significa que la BL posterior comienza
+en una región del espacio próxima a un buen óptimo local, pudiendo encontrar uno aún
+mejor en las $2\,000$ evaluaciones disponibles. En BMB, una solución aleatoria en
+syp\_500 está tan lejos de cualquier óptimo que $2\,000$ evals son insuficientes para
+llegar a ninguno.
+
+ILS tiene alta varianza en syp\_500 ($\sigma=0{,}095$): la perturbación del 20\% puede
+llevar a zonas muy diferentes del espacio y el resultado depende de si la BL consigue
+explotar esa zona dentro del presupuesto.
+
+\subsection{Comportamiento de ILS-ES: hibridación SA + perturbación}
+
+ILS-ES obtiene resultados intermedios entre SA e ILS en syp\_500 (fitness $-2{,}709$,
+mejor que ILS $-2{,}819$ pero peor que SA puro $-2{,}627$). Sin embargo, ILS-ES destaca
+en \textbf{capacidad de generalización}: en Ben.2025, ILS-ES iguala a SA ($0{,}022$) en
+syp\_500 con menor varianza en test ($\sigma=0{,}035$ vs $0{,}029$), y supera a SA en
+syp\_100 (Ben.2025: $0{,}098$ vs $0{,}096$).
+
+La diversificación que aporta la mutación del 20\% entre llamadas a SA parece ayudar
+a encontrar soluciones que generalizan mejor, aunque con un ligero coste en fitness de
+entrenamiento. Cada iteración de SA dispone de $\lfloor 10\,000/5 \rfloor = 2\,000$
+evaluaciones, que para syp\_500 equivalen a los mismos $M=\max(1,\lfloor 2000/4570\rfloor)=1$
+enfriamiento con $4\,570$ vecinos máximos, siendo en práctica una ejecución SA muy corta.
+
+La varianza de ILS-ES en syp\_500 ($\sigma=0{,}016$) es la segunda más baja tras SA
+($\sigma=0{,}009$), lo que indica que la perturbación no introduce inestabilidad excesiva
+respecto a SA puro.
+
+\subsection{Comparativa general P1-P2 vs P3}
+
+\begin{center}
+\begin{tabular}{lcccc}
+\toprule
+\textbf{Dataset} & \textbf{Mejor P1} & \textbf{Mejor P2} & \textbf{Mejor P3} & \textbf{Mejora P3 vs P2} \\
+\midrule
+ibex\_35  & BL ($-4.573$) & AM-Best ($-4.491$) & ILS ($-4.535$) & $-0.044$ \\
+syp\_100  & BL ($-3.032$) & AM-Best ($-2.912$) & SA ($-2.870$)  & $+0.042$ \\
+syp\_500  & BL ($-3.318$) & AM-Best ($-2.811$) & SA ($-2.627$)  & $+0.184$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+El patrón más importante es la \textbf{inversión de ventaja con $N$}. Para $N$ pequeño
+(ibex\_35), AM-Best (P2) sigue siendo el mejor algoritmo: la exploración global de la
+población evolutiva y la BL sobre los mejores individuos es insuperable en espacios
+pequeños. Ningún algoritmo de P3 supera a AM-Best en ibex\_35.
+
+Para $N$ grande (syp\_100 y especialmente syp\_500), los algoritmos de trayectoria de P3
+superan a los evolutivos de P2. SA supera a AM-Best en $0{,}184$ unidades de fitness en
+syp\_500 — una diferencia considerable. La razón es que, en alta dimensión, la evaluación
+de fitness es $O(N^2)$ (por la covarianza), lo que hace que 10\,000 evaluaciones se
+consuman rápidamente. SA, con su operador de vecindad simple ($O(1)$ para generar el
+vecino), aprovecha mejor el presupuesto explorando un número mayor de puntos del espacio.
+
+\subsection{Análisis de la variabilidad ($\sigma$)}
+
+La variabilidad refleja la sensibilidad de cada algoritmo a la semilla inicial:
+
+\begin{itemize}
+  \item \textbf{SA}: $\sigma$ mínima ($0{,}009$ en syp\_500). El enfriamiento progresivo
+  produce convergencia robusta independiente de la solución inicial.
+
+  \item \textbf{ILS-ES}: segunda menor varianza ($0{,}011$--$0{,}016$). La combinación
+  SA + perturbación estabiliza la búsqueda.
+
+  \item \textbf{BMB}: varianza moderada. Los 5 reinicios aleatorios cubren distintas
+  zonas pero no convergen en problemas grandes.
+
+  \item \textbf{ILS}: mayor varianza de P3 en syp\_500 ($\sigma=0{,}095$), similar a BL
+  ($\sigma=0{,}164$ es el peor). La perturbación del 20\% puede llevar a zonas muy
+  distintas con resultados inconsistentes.
+
+  \item \textbf{AM-Best (P2)}: $\sigma=0{,}001$ en ibex\_35 — prácticamente
+  determinístico —, pero $\sigma=0{,}031$ en syp\_500.
+\end{itemize}
+
+\subsection{Análisis de los boxplots}
+
+Los boxplots (Figuras~\ref{fig:box_ibex}--\ref{fig:box_syp500}) confirman el análisis:
+
+\begin{itemize}
+  \item En \textbf{ibex\_35}, AM-Best domina con caja casi imperceptible (determinístico).
+  ILS y BMB tienen medianas próximas pero con cajas más anchas. SA e ILS-ES se agrupan
+  claramente por debajo de AM-Best, con cajas similares entre sí (ambos usan SA como
+  núcleo). Greedy, aunque determinístico, aparece en la parte baja.
+
+  \item En \textbf{syp\_100}, SA e ILS-ES aparecen visiblemente por encima de AM-Best,
+  con cajas muy compactas. BMB e ILS tienen medianas parecidas entre sí pero peores que
+  SA/ILS-ES. BL está claramente por debajo de todos los algoritmos P3. La escala visual
+  permite apreciar la diferencia entre trayectorias (SA/ILS-ES) y el resto.
+
+  \item En \textbf{syp\_500}, la separación entre grupos es máxima: SA tiene la mediana
+  más alta y la caja más pequeña de todos los algoritmos. ILS-ES está inmediatamente
+  por debajo. Después viene el grupo AM-Best/ILS. BMB y BL aparecen claramente
+  separados hacia abajo. Random y Greedy son los peores.
+\end{itemize}
+
+\subsection{Capacidad de generalización (test 2025)}
+
+La columna Ben.2025 (beneficio real en el año de test) muestra un patrón consistente:
+los algoritmos con mejor fitness de entrenamiento no siempre generalizan mejor.
+
+\begin{center}
+\begin{tabular}{lcc|c}
+\toprule
+\textbf{Algoritmo} & \textbf{Train (syp\_500)} & \textbf{Test 2025 (syp\_500)} & \textbf{Ben.2025} \\
+\midrule
+\textbf{Greedy}  & $-3.438$ & $-5.205$ & $-0.063$ \\
+\textbf{BL}      & $-3.318$ & $-4.228$ & $0.008$ \\
+\textbf{AM-Best} & $-2.811$ & $-3.907$ & $0.017$ \\
+\textbf{ILS}     & $-2.819$ & $-4.004$ & $0.015$ \\
+\textbf{SA}      & $-2.627$ & $-3.917$ & $0.022$ \\
+\textbf{ILS-ES}  & $-2.709$ & $-3.895$ & $\mathbf{0.022}$ \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+SA obtiene el mejor fitness de entrenamiento ($-2{,}627$) pero ILS-ES obtiene el mejor
+Ben.2025 ($0{,}022$). Esto sugiere que la diversificación de ILS-ES evita un leve
+sobreajuste al periodo de entrenamiento que SA puede presentar.
+
+\subsection{Conclusiones generales}
+
+\begin{enumerate}
+  \item \textbf{SA es el mejor algoritmo para $N$ grande}: supera a todos (incluyendo
+  AM-Best de P2) en syp\_100 y syp\_500, con la menor varianza. Su ventaja crece con
+  $N$ debido a la eficiencia de su operador de vecindad ($O(1)$ generación vs $O(N^2)$
+  por pasada en BL).
+
+  \item \textbf{BMB fracasa en alta dimensión}: el presupuesto de $2\,000$ evals/BL es
+  insuficiente para convergencia en syp\_500 ($208\,392$ vecinos). Un único reinicio en
+  una zona aleatoria nunca llega a explotarse correctamente.
+
+  \item \textbf{ILS supera a BMB} porque la perturbación del 20\% sobre la mejor solución
+  mantiene la búsqueda en zonas prometedoras, mientras que el reinicio aleatorio de BMB
+  pierde ese contexto.
+
+  \item \textbf{ILS-ES ofrece el mejor equilibrio generalización/consistencia}: menor
+  varianza que ILS, mejor Ben.2025 que SA puro, con tiempo de cómputo reducido.
+
+  \item \textbf{AM-Best (P2) sigue siendo el mejor para $N$ pequeño}: en ibex\_35 ningún
+  algoritmo de P3 lo supera. La exploración poblacional es más valiosa en espacios
+  pequeños con presupuesto suficiente para convergencia de la BL.
+\end{enumerate}
+
+%-----------------------------------------------------------------------
+\section{Trabajo Voluntario: Estudio de los Parámetros de SA}
+%-----------------------------------------------------------------------
+
+Se ha implementado el ejecutable \texttt{study\_sa\_params} que realiza un barrido
+sistemático de los parámetros $\varphi$ (probabilidad de aceptación inicial) y
+$k_{vec}$ (factor de vecindad), con 50 semillas por configuración sobre los tres datasets.
+
+\subsection{Invarianza de fase: por qué $\varphi$ no afecta a los resultados}
+
+Teóricamente, $\varphi$ controla la temperatura inicial:
+$T_0 = \mu \cdot |\text{fitness}| / (-\ln\varphi)$.
+Valores mayores de $\varphi$ producen mayores $T_0$ (mayor exploración inicial).
+
+Sin embargo, el \textbf{esquema de Cauchy modificado presenta invarianza de fase}:
+pasado el primer enfriamiento, la temperatura converge a
+$T_k \approx 1/(\beta \cdot k)$ independientemente de $T_0$.
+Para el segundo paso:
+$T_2 = T_1/(1+\beta T_1) = T_0/[(1+\beta T_0)(1+\beta \cdot T_0/(1+\beta T_0))]$,
+que para $T_0$ grande se aproxima a $1/(\beta \cdot 2)$ — independiente de $T_0$, y
+por tanto de $\varphi$.
+
+La consecuencia práctica es que $\varphi$ solo afecta al primer enfriamiento ($k=1$), y
+las $M-1$ iteraciones restantes convergen al mismo comportamiento sin importar
+el valor de $\varphi$.
+
+\subsection{Resultados: estudio de $\varphi$}
+
+\begin{table}[H]
+\centering\footnotesize
+\caption{Estudio de $\varphi$ en SA --- IBEX 35 ($N=30$, mu=0.2, $T_f=10^{-3}$, $k_{vec}=10$)}
+\begin{tabular}{lrrr}
+\toprule
+$\varphi$ & \textbf{Fit.Train} $\pm\sigma$ & \textbf{Fit.2025} $\pm\sigma$ & \textbf{Ben.2025} \\
+\midrule
+$0{,}05$ & $-4{,}6051 \pm 0{,}0358$ & $-3{,}1439 \pm 0{,}0418$ & $0{,}0341$ \\
+$0{,}10$ & $-4{,}6051 \pm 0{,}0358$ & $-3{,}1439 \pm 0{,}0418$ & $0{,}0341$ \\
+$0{,}20$ & $-4{,}6051 \pm 0{,}0358$ & $-3{,}1439 \pm 0{,}0418$ & $0{,}0341$ \\
+$0{,}30$ & $-4{,}6051 \pm 0{,}0358$ & $-3{,}1439 \pm 0{,}0418$ & $0{,}0341$ \\
+$0{,}50$ & $-4{,}6051 \pm 0{,}0358$ & $-3{,}1439 \pm 0{,}0418$ & $0{,}0341$ \\
+$0{,}70$ & $-4{,}6051 \pm 0{,}0358$ & $-3{,}1439 \pm 0{,}0418$ & $0{,}0341$ \\
+$0{,}90$ & $-4{,}6051 \pm 0{,}0358$ & $-3{,}1439 \pm 0{,}0418$ & $0{,}0341$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering\footnotesize
+\caption{Estudio de $\varphi$ en SA --- S\&P 100 ($N=97$)}
+\begin{tabular}{lrrr}
+\toprule
+$\varphi$ & \textbf{Fit.Train} $\pm\sigma$ & \textbf{Fit.2025} $\pm\sigma$ & \textbf{Ben.2025} \\
+\midrule
+$0{,}05$ & $-2{,}8699 \pm 0{,}0148$ & $-3{,}7801 \pm 0{,}0256$ & $0{,}0963$ \\
+$0{,}10$ & $-2{,}8699 \pm 0{,}0148$ & $-3{,}7801 \pm 0{,}0256$ & $0{,}0963$ \\
+$0{,}20$ & $-2{,}8699 \pm 0{,}0148$ & $-3{,}7801 \pm 0{,}0256$ & $0{,}0963$ \\
+$0{,}30$ & $-2{,}8699 \pm 0{,}0148$ & $-3{,}7801 \pm 0{,}0256$ & $0{,}0963$ \\
+$0{,}50$ & $-2{,}8699 \pm 0{,}0148$ & $-3{,}7801 \pm 0{,}0256$ & $0{,}0963$ \\
+$0{,}70$ & $-2{,}8699 \pm 0{,}0148$ & $-3{,}7801 \pm 0{,}0256$ & $0{,}0963$ \\
+$0{,}90$ & $-2{,}8699 \pm 0{,}0148$ & $-3{,}7801 \pm 0{,}0256$ & $0{,}0963$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering\footnotesize
+\caption{Estudio de $\varphi$ en SA --- S\&P 500 ($N=457$)}
+\begin{tabular}{lrrr}
+\toprule
+$\varphi$ & \textbf{Fit.Train} $\pm\sigma$ & \textbf{Fit.2025} $\pm\sigma$ & \textbf{Ben.2025} \\
+\midrule
+$0{,}05$ & $-2{,}6270 \pm 0{,}0091$ & $-3{,}9170 \pm 0{,}0286$ & $0{,}0217$ \\
+$0{,}10$ & $-2{,}6270 \pm 0{,}0091$ & $-3{,}9170 \pm 0{,}0286$ & $0{,}0217$ \\
+$0{,}20$ & $-2{,}6270 \pm 0{,}0091$ & $-3{,}9170 \pm 0{,}0286$ & $0{,}0217$ \\
+$0{,}30$ & $-2{,}6270 \pm 0{,}0091$ & $-3{,}9170 \pm 0{,}0286$ & $0{,}0217$ \\
+$0{,}50$ & $-2{,}6270 \pm 0{,}0091$ & $-3{,}9170 \pm 0{,}0286$ & $0{,}0217$ \\
+$0{,}70$ & $-2{,}6270 \pm 0{,}0091$ & $-3{,}9170 \pm 0{,}0286$ & $0{,}0217$ \\
+$0{,}90$ & $-2{,}6270 \pm 0{,}0091$ & $-3{,}9170 \pm 0{,}0286$ & $0{,}0217$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Los tres datasets exhiben la misma \textbf{invarianza perfecta}: los 7 valores de $\varphi$
+producen exactamente los mismos resultados (hasta el último decimal), confirmando
+empíricamente la propiedad teórica de la invarianza de fase de Cauchy.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.85\textwidth,
+  height=5.5cm,
+  xlabel={Parámetro $\varphi$},
+  ylabel={Fitness de entrenamiento (media)},
+  xtick={0.05, 0.1, 0.2, 0.3, 0.5, 0.7, 0.9},
+  xticklabels={$0.05$,$0.1$,$0.2$,$0.3$,$0.5$,$0.7$,$0.9$},
+  legend style={at={(0.98,0.5)}, anchor=east, font=\small},
+  grid=major,
+  grid style={dashed, gray!40},
+  tick label style={font=\small},
+  label style={font=\small},
+  ymin=-5.0, ymax=-2.3,
+]
+% ibex_35: constante -4.6051 para todos los phi
+\addplot[color=blue!80!black, mark=square*, thick, mark size=2pt] coordinates {
+  (0.05, -4.6051) (0.1, -4.6051) (0.2, -4.6051) (0.3, -4.6051)
+  (0.5, -4.6051)  (0.7, -4.6051) (0.9, -4.6051)
+};
+\addlegendentry{IBEX 35 ($N=30$)}
+
+% syp_100: constante -2.8699
+\addplot[color=red!80!black, mark=triangle*, thick, mark size=2pt] coordinates {
+  (0.05, -2.8699) (0.1, -2.8699) (0.2, -2.8699) (0.3, -2.8699)
+  (0.5, -2.8699)  (0.7, -2.8699) (0.9, -2.8699)
+};
+\addlegendentry{S\&P 100 ($N=97$)}
+
+% syp_500: constante -2.6270
+\addplot[color=green!60!black, mark=*, thick, mark size=2pt] coordinates {
+  (0.05, -2.6270) (0.1, -2.6270) (0.2, -2.6270) (0.3, -2.6270)
+  (0.5, -2.6270)  (0.7, -2.6270) (0.9, -2.6270)
+};
+\addlegendentry{S\&P 500 ($N=457$)}
+\end{axis}
+\end{tikzpicture}
+\caption{Fitness de entrenamiento de SA en función de $\varphi$ para los tres datasets.
+Las tres líneas son perfectamente horizontales: $\varphi$ no tiene ningún efecto práctico
+debido a la invarianza de fase del esquema de enfriamiento de Cauchy modificado.}
+\label{fig:phi_flat}
+\end{figure}
+
+\subsection{Resultados: estudio de $k_{vec}$}
+
+\begin{table}[H]
+\centering\footnotesize
+\caption{Estudio de $k_{vec}$ en SA --- IBEX 35 ($N=30$, $\varphi=0.3$, mu=0.2, $T_f=10^{-3}$)}
+\begin{tabular}{rrrr}
+\toprule
+$k_{vec}$ & \textbf{Fit.Train} $\pm\sigma$ & \textbf{Fit.2025} $\pm\sigma$ & \textbf{Ben.2025} \\
+\midrule
+$2$  & $-4{,}6901 \pm 0{,}0627$ & $-3{,}1770 \pm 0{,}0495$ & $0{,}0349$ \\
+$5$  & $-4{,}6264 \pm 0{,}0401$ & $-3{,}1513 \pm 0{,}0416$ & $0{,}0342$ \\
+$10$ & $-4{,}6051 \pm 0{,}0358$ & $-3{,}1439 \pm 0{,}0418$ & $0{,}0341$ \\
+$15$ & $-4{,}5935 \pm 0{,}0299$ & $-3{,}1394 \pm 0{,}0412$ & $0{,}0337$ \\
+$20$ & $-4{,}5916 \pm 0{,}0301$ & $-3{,}1385 \pm 0{,}0413$ & $0{,}0336$ \\
+$30$ & $-4{,}5856 \pm 0{,}0262$ & $-3{,}1359 \pm 0{,}0406$ & $0{,}0339$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering\footnotesize
+\caption{Estudio de $k_{vec}$ en SA --- S\&P 100 ($N=97$)}
+\begin{tabular}{rrrr}
+\toprule
+$k_{vec}$ & \textbf{Fit.Train} $\pm\sigma$ & \textbf{Fit.2025} $\pm\sigma$ & \textbf{Ben.2025} \\
+\midrule
+$2$  & $-2{,}8866 \pm 0{,}0152$ & $-3{,}7866 \pm 0{,}0227$ & $0{,}0959$ \\
+$5$  & $-2{,}8725 \pm 0{,}0148$ & $-3{,}7803 \pm 0{,}0231$ & $0{,}0964$ \\
+$10$ & $-2{,}8699 \pm 0{,}0148$ & $-3{,}7801 \pm 0{,}0256$ & $0{,}0963$ \\
+$15$ & $-2{,}8737 \pm 0{,}0149$ & $-3{,}7808 \pm 0{,}0248$ & $0{,}0962$ \\
+$20$ & $-2{,}8731 \pm 0{,}0149$ & $-3{,}7811 \pm 0{,}0245$ & $0{,}0962$ \\
+$30$ & $-2{,}8830 \pm 0{,}0177$ & $-3{,}7851 \pm 0{,}0240$ & $0{,}0958$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{table}[H]
+\centering\footnotesize
+\caption{Estudio de $k_{vec}$ en SA --- S\&P 500 ($N=457$)}
+\begin{tabular}{rrrr}
+\toprule
+$k_{vec}$ & \textbf{Fit.Train} $\pm\sigma$ & \textbf{Fit.2025} $\pm\sigma$ & \textbf{Ben.2025} \\
+\midrule
+$2$  & $-2{,}6270 \pm 0{,}0091$ & $-3{,}9170 \pm 0{,}0286$ & $0{,}0217$ \\
+$5$  & $-2{,}6270 \pm 0{,}0091$ & $-3{,}9170 \pm 0{,}0286$ & $0{,}0217$ \\
+$10$ & $-2{,}6270 \pm 0{,}0091$ & $-3{,}9170 \pm 0{,}0286$ & $0{,}0217$ \\
+$15$ & $-2{,}6430 \pm 0{,}0138$ & $-3{,}9047 \pm 0{,}0286$ & $0{,}0219$ \\
+$20$ & $-2{,}6421 \pm 0{,}0150$ & $-3{,}9053 \pm 0{,}0290$ & $0{,}0219$ \\
+$30$ & $-2{,}6420 \pm 0{,}0151$ & $-3{,}9053 \pm 0{,}0290$ & $0{,}0219$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+\begin{axis}[
+  width=0.85\textwidth,
+  height=6cm,
+  xlabel={Parámetro $k_{vec}$},
+  ylabel={Mejora de fitness respecto a $k_{vec}=2$ (\%)},
+  xtick={2, 5, 10, 15, 20, 30},
+  xticklabels={$2$,$5$,$10$,$15$,$20$,$30$},
+  legend style={at={(0.02,0.02)}, anchor=south west, font=\small},
+  grid=major,
+  grid style={dashed, gray!40},
+  ymin=-1.0, ymax=2.5,
+  tick label style={font=\small},
+  label style={font=\small},
+]
+
+% ibex_35: base k=2: -4.6901, mejora = (4.6901-x)/4.6901*100
+\addplot[color=blue!80!black, mark=square*, thick, mark size=2.5pt] coordinates {
+  (2,  0.00)
+  (5,  1.36)
+  (10, 1.81)
+  (15, 2.06)
+  (20, 2.10)
+  (30, 2.23)
+};
+\addlegendentry{IBEX 35 ($N=30$)}
+
+% syp_100: base k=2: -2.8866, optimo en k=10 (0.58%)
+\addplot[color=red!80!black, mark=triangle*, thick, mark size=2.5pt] coordinates {
+  (2,  0.00)
+  (5,  0.49)
+  (10, 0.58)
+  (15, 0.45)
+  (20, 0.47)
+  (30, 0.12)
+};
+\addlegendentry{S\&P 100 ($N=97$)}
+
+% syp_500: identica para k<=10, se degrada para k>=15 (colapso M=1)
+\addplot[color=green!60!black, mark=*, thick, mark size=2.5pt] coordinates {
+  (2,  0.00)
+  (5,  0.00)
+  (10, 0.00)
+  (15, -0.61)
+  (20, -0.57)
+  (30, -0.57)
+};
+\addlegendentry{S\&P 500 ($N=457$)}
+
+% Línea vertical en k=10 (punto óptimo general)
+\draw[dashed, gray!70, thick] (axis cs:10,-0.8) -- (axis cs:10,2.5)
+  node[above, font=\scriptsize, gray!80!black] {$k=10$};
+\end{axis}
+\end{tikzpicture}
+\caption{Mejora porcentual del fitness de entrenamiento de SA respecto a $k_{vec}=2$,
+en función de $k_{vec}$. En S\&P 500 los valores negativos indican degradación (escala
+de los ejes): para $k_{vec}\geq 15$ el número de enfriamientos $M$ colapsa a 1,
+limitando la exploración. En IBEX 35 la mejora es monótona. En S\&P 100 hay un máximo
+en $k_{vec}=10$.}
+\label{fig:kvec_curve}
+\end{figure}
+
+\subsection{Análisis del estudio de $k_{vec}$}
+
+El comportamiento varía notablemente según el dataset:
+
+\textbf{IBEX 35 ($N=30$)}: La mejora es \textbf{monotónamente creciente} con $k_{vec}$.
+Con max\_vec$=k_{vec}\cdot N$, más vecinos por temperatura implica mayor exploración por
+paso de enfriamiento. Para $N=30$ el coste es bajo y se puede permitir $k_{vec}$ grande
+sin que $M$ se vea muy reducido: para $k_{vec}=30$, $M=\lfloor 10000/900 \rfloor=11$
+(aún suficientes enfriamientos).
+
+\textbf{S\&P 100 ($N=97$)}: Máximo en $k_{vec}=10$ con fitness $-2{,}870$. Para $k_{vec}=30$,
+max\_vec$=2910$ y $M=\lfloor 10000/2910\rfloor=3$, demasiado pocos enfriamientos para
+explorar el espacio térmico completo; la calidad cae.
+
+\textbf{S\&P 500 ($N=457$)}: \textbf{Fenómeno de colapso para $k_{vec}\geq15$}:
+max\_vec$=15\times457=6855$ y $M=\max(1,\lfloor10000/6855\rfloor)=1$. Con solo un
+enfriamiento, el algoritmo hace una única pasada de hasta $6855$ vecinos a temperatura
+$T_0$ (sin enfriar) y termina. Los resultados empeoran respecto a $k_{vec}\leq10$.
+Para $k_{vec}\in\{2,5,10\}$: max\_vec$\in\{914, 2285, 4570\}$ y $M\in\{10,4,2\}$,
+dando todos $M\times\text{max\_vec}\approx9140$ evaluaciones totales — por eso los tres
+valores producen resultados \textbf{idénticamente iguales} (mismas evaluaciones,
+mismo recorrido estocástico con la misma semilla).
+
+\subsection{Conclusiones del estudio de parámetros}
+
+\begin{enumerate}
+  \item \textbf{$\varphi$ es irrelevante}: la invarianza de fase de Cauchy lo confirma
+  tanto teórica como empíricamente. El valor predeterminado $\varphi=0{,}3$ puede
+  mantenerse sin efectos sobre el rendimiento.
+
+  \item \textbf{$k_{vec}=10$ es el valor recomendado}: equilibrio óptimo en syp\_100,
+  y evita el colapso a $M=1$ en syp\_500. Para $N$ pequeño (ibex\_35), valores mayores
+  mejoran ligeramente pero el efecto es marginal.
+
+  \item \textbf{El factor de colpaso $M=1$} aparece cuando max\_vec$>$ maxEvals. Para
+  evitarlo, $k_{vec} < \text{maxEvals}/N$: con maxEvals$=10\,000$ y $N=457$, la cota
+  es $k_{vec}<21{,}9$, es decir $k_{vec}\leq21$. El valor $k_{vec}=10$ mantiene un
+  margen seguro en todos los datasets.
+\end{enumerate}
+
+\end{document}

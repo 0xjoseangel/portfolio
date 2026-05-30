@@ -155,6 +155,33 @@ void writeBoxplotCSV(
   cout << "CSV boxplot escrito en: " << filename << "\n";
 }
 
+// Escribe CSV de estadísticas para la tabla de la memoria:
+//   alg, mean_train, std_train, mean_test, std_test, mean_ben, mean_evals, mean_time
+void writeStatsCSV(
+    const string& filename,
+    const vector<pair<string, vector<RunResult>>>& alg_results) {
+  auto f_train = [](const RunResult& r) { return r.fitness_train; };
+  auto f_test  = [](const RunResult& r) { return r.fitness_test; };
+  auto f_ben   = [](const RunResult& r) { return r.beneficio_test; };
+  auto f_evals = [](const RunResult& r) { return (double)r.evaluations; };
+  auto f_time  = [](const RunResult& r) { return r.time_sec; };
+
+  ofstream f(filename);
+  f << "alg,mean_train,std_train,mean_test,std_test,mean_ben,mean_evals,mean_time\n";
+  for (auto& [name, res] : alg_results) {
+    f << name << ","
+      << fixed << setprecision(6)
+      << mean(res, f_train) << ","
+      << stddev(res, f_train) << ","
+      << mean(res, f_test)  << ","
+      << stddev(res, f_test) << ","
+      << mean(res, f_ben)   << ","
+      << setprecision(1) << mean(res, f_evals) << ","
+      << setprecision(4) << mean(res, f_time)  << "\n";
+  }
+  cout << "CSV estadísticas escrito en: " << filename << "\n";
+}
+
 // ── Main ──────────────────────────────────────────────────────────────────────
 
 int main(int argc, char* argv[]) {
@@ -219,6 +246,7 @@ int main(int argc, char* argv[]) {
 
     printTable(ds.name, alg_results);
     writeBoxplotCSV("p3_results_" + ds.name + ".csv", alg_results);
+    writeStatsCSV("p3_stats_" + ds.name + ".csv", alg_results);
   }
 
   return 0;
