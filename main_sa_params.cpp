@@ -181,7 +181,7 @@ int main(int argc, char* argv[]) {
       }
 
       printStudyTable(ds.name, "phi", phis, results);
-      writeCSV("sa_phi_" + ds.name + ".csv", "phi", phis, results);
+      writeCSV("results/studies/sa_phi_" + ds.name + ".csv", "phi", phis, results);
     }
 
     // ── Estudio 2: k_vecinos ─────────────────────────────────────────────────
@@ -200,7 +200,7 @@ int main(int argc, char* argv[]) {
       }
 
       printStudyTable(ds.name, "k_vecinos", k_vecinos, results);
-      writeCSV("sa_kvecinos_" + ds.name + ".csv", "k_vecinos", k_vecinos, results);
+      writeCSV("results/studies/sa_kvecinos_" + ds.name + ".csv", "k_vecinos", k_vecinos, results);
     }
   }
 

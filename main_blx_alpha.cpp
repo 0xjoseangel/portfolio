@@ -149,7 +149,7 @@ int main(int argc, char* argv[]) {
     }
 
     printStudyTable(ds.name, alphas, all_results);
-    writeCSV("blx_alpha_" + ds.name + ".csv", alphas, all_results);
+    writeCSV("results/studies/blx_alpha_" + ds.name + ".csv", alphas, all_results);
   }
 
   return 0;

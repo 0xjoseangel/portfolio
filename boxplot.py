@@ -28,8 +28,15 @@ ALPHA_TITLES = {
 }
 
 
-def plot_results(fname_stem, df):
-    """Boxplot for results_*.csv (columns: alg, fitness)."""
+RESULT_DIRS = [
+    "results/all_algorithms",
+    "results/p3",
+    "results/studies",
+]
+
+
+def plot_results(out_path, fname_stem, df):
+    """Boxplot for results_*.csv / p3_results_*.csv (columns: alg, fitness)."""
     df["alg"] = df["alg"].str.strip()
     order = [a for a in ORDER if a in df["alg"].unique()]
 
@@ -42,13 +49,12 @@ def plot_results(fname_stem, df):
     ax.set_ylabel("Fitness (train 2015–2024)")
     ax.tick_params(axis="x", rotation=30)
     plt.tight_layout()
-    out = fname_stem + ".png"
-    fig.savefig(out, dpi=150, bbox_inches="tight")
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"  -> {out}")
+    print(f"  -> {out_path}")
 
 
-def plot_alpha(fname_stem, df):
+def plot_alpha(out_path, fname_stem, df):
     """Boxplot for blx_alpha_*.csv (columns: alpha, fitness_train, fitness_test)."""
     df["alpha"] = df["alpha"].round(2)
     alphas = sorted(df["alpha"].unique())
@@ -68,30 +74,34 @@ def plot_alpha(fname_stem, df):
         ax.tick_params(axis="x", rotation=0)
 
     plt.tight_layout()
-    out = fname_stem + ".png"
-    fig.savefig(out, dpi=150, bbox_inches="tight")
+    fig.savefig(out_path, dpi=150, bbox_inches="tight")
     plt.close(fig)
-    print(f"  -> {out}")
+    print(f"  -> {out_path}")
 
 
 def main():
-    csvs = [f for f in os.listdir(".") if f.endswith(".csv")]
-    for fname in sorted(csvs):
-        stem = fname[:-4]
-        try:
-            df = pd.read_csv(fname)
-        except Exception as e:
-            print(f"  [skip] {fname}: {e}")
+    for directory in RESULT_DIRS:
+        if not os.path.isdir(directory):
             continue
+        csvs = [f for f in os.listdir(directory) if f.endswith(".csv")]
+        for fname in sorted(csvs):
+            stem = fname[:-4]
+            path = os.path.join(directory, fname)
+            try:
+                df = pd.read_csv(path)
+            except Exception as e:
+                print(f"  [skip] {path}: {e}")
+                continue
 
-        if "alg" in df.columns and "fitness" in df.columns:
-            print(f"Procesando resultados: {fname}")
-            plot_results(stem, df)
-        elif "alpha" in df.columns and "fitness_train" in df.columns:
-            print(f"Procesando estudio alpha: {fname}")
-            plot_alpha(stem, df)
-        else:
-            print(f"  [skip] {fname}: columnas no reconocidas")
+            out_path = os.path.join(directory, stem + ".png")
+            if "alg" in df.columns and "fitness" in df.columns:
+                print(f"Procesando resultados: {path}")
+                plot_results(out_path, stem, df)
+            elif "alpha" in df.columns and "fitness_train" in df.columns:
+                print(f"Procesando estudio alpha: {path}")
+                plot_alpha(out_path, stem, df)
+            else:
+                print(f"  [skip] {path}: columnas no reconocidas")
 
 
 if __name__ == "__main__":

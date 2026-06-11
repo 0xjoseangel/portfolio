@@ -260,7 +260,7 @@ int main(int argc, char* argv[]) {
     };
 
     printTable(ds.name, alg_results);
-    writeBoxplotCSV("results_" + ds.name + ".csv", alg_results);
+    writeBoxplotCSV("results/all_algorithms/results_" + ds.name + ".csv", alg_results);
   }
 
   return 0;

@@ -245,8 +245,8 @@ int main(int argc, char* argv[]) {
     };
 
     printTable(ds.name, alg_results);
-    writeBoxplotCSV("p3_results_" + ds.name + ".csv", alg_results);
-    writeStatsCSV("p3_stats_" + ds.name + ".csv", alg_results);
+    writeBoxplotCSV("results/p3/p3_results_" + ds.name + ".csv", alg_results);
+    writeStatsCSV("results/p3/p3_stats_" + ds.name + ".csv", alg_results);
   }
 
   return 0;
