@@ -6,8 +6,6 @@
 template <typename tDomain>
 ILS<tDomain>::ILS(int it) : iteraciones(it) {}
 
-// Muta el 20% de los elementos: selecciona 20% de posiciones,
-// desordenan sus valores y los reasigna
 template <typename tDomain>
 tSolution<tDomain> ILS<tDomain>::mutar(const tSolution<tDomain>& sol,
                                        Problem<tDomain>& problem) {
@@ -16,21 +14,17 @@ tSolution<tDomain> ILS<tDomain>::mutar(const tSolution<tDomain>& sol,
 
   auto mutada = sol;
 
-  // Seleccionar n_mut índices aleatorios
   std::vector<int> indices(N);
   std::iota(indices.begin(), indices.end(), 0);
   Random::shuffle(indices);
 
-  // Extraer valores de esas posiciones
   std::vector<tDomain> valores_mut;
   for (int i = 0; i < n_mut; i++) {
     valores_mut.push_back(mutada[indices[i]]);
   }
 
-  // Desordenar esos valores
   Random::shuffle(valores_mut);
 
-  // Reasignarlos a las mismas posiciones
   for (int i = 0; i < n_mut; i++) {
     mutada[indices[i]] = valores_mut[i];
   }

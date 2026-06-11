@@ -7,7 +7,7 @@ template <typename tDomain>
 class SA : public MH<tDomain> {
  public:
   SA(double phi = 0.3, double mu = 0.2, double Tf = 1e-3,
-     int k_vecinos = 10, int k_exitos = 1);
+     int k_vecinos = 10, int k_exitos = 1, double proportion = 0.4);
   ~SA() override = default;
 
   ResultMH<tDomain> optimize(Problem<tDomain>& problem, int maxevals) override;
@@ -20,6 +20,10 @@ class SA : public MH<tDomain> {
   double Tf;
   int k_vecinos;
   int k_exitos;
+  double proportion;
+
+  tSolution<tDomain> generarVecino(const tSolution<tDomain>& sol,
+                                   Problem<tDomain>& problem);
 };
 
 #endif

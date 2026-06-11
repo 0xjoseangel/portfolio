@@ -3,21 +3,30 @@
 #include <cmath>
 
 template <typename tDomain>
-SA<tDomain>::SA(double phi, double mu, double Tf, int k_vecinos, int k_exitos)
-    : phi(phi), mu(mu), Tf(Tf), k_vecinos(k_vecinos), k_exitos(k_exitos) {}
+SA<tDomain>::SA(double phi, double mu, double Tf, int k_vecinos, int k_exitos,
+                double proportion)
+    : phi(phi), mu(mu), Tf(Tf), k_vecinos(k_vecinos), k_exitos(k_exitos),
+      proportion(proportion) {}
 
-// Generar vecino: cambiar 1 posición a valor aleatorio
 template <typename tDomain>
-tSolution<tDomain> generarVecino(const tSolution<tDomain>& sol,
-                                  Problem<tDomain>& problem) {
+tSolution<tDomain> SA<tDomain>::generarVecino(const tSolution<tDomain>& sol,
+                                               Problem<tDomain>& problem) {
   int N = sol.size();
   auto [lo, hi] = problem.getSolutionDomainRange();
 
-  auto vecino = sol;
-  int pos = Random::get(0, N - 1);
-  vecino[pos] = Random::get(lo, hi);
-  problem.fix(vecino);
+  int origen = Random::get(0, N - 1);
+  int destino;
+  do { destino = Random::get(0, N - 1); } while (destino == origen);
 
+  double cantidad = sol[origen] * proportion;
+  cantidad = std::min(cantidad, sol[origen] - lo);
+  cantidad = std::min(cantidad, hi - sol[destino]);
+
+  auto vecino = sol;
+  if (cantidad > 1e-15) {
+    vecino[origen] -= cantidad;
+    vecino[destino] += cantidad;
+  }
   return vecino;
 }
 
