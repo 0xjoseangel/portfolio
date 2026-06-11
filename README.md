@@ -4,7 +4,7 @@
 ![C++17](https://img.shields.io/badge/C%2B%2B-17-blue.svg)
 ![License](https://img.shields.io/badge/license-GPL--3.0-green.svg)
 
-**Asignatura:** Metaheurísticas — Grado en Ingeniería Informática, UGR (curso 2025-26)
+**Asignatura:** Metaheurísticas — Grado en Ingeniería Informática y ADE, UGR (curso 2025-26)
 **Autor:** Jose Angel Carretero Montes — Grupo 3
 
 Implementación y comparación experimental de **14 metaheurísticas** —
